@@ -5,3 +5,110 @@
  * Main functionality for Notes Field module.
  */
 
+/**
+ * Implements hook_field_info().
+ */
+function notes_field_field_info() {
+  return array(
+    'notes_field' => array(
+      'label' => t('Notes Field'),
+      'description' => t('Field for taking notes.'),
+      'settings' => array(),
+      'instance_settings' => array(),
+      'default_widget' => 'notes_field_widget',
+      'default_formatter' => 'notes_field_formatter',
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function notes_field_field_is_empty($item, $field) {
+  // @todo update hook with actual values.
+  if (empty($item['value']) && $item['value'] !== '0') {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Implements hook_field_settings_form().
+ */
+function notes_field_field_settings_form($field, $instance, $has_data) {
+  $settings = $field['settings'];
+  // @todo update hook with rows size
+  $form['max_length'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Size of textarea'),
+    '#default_value' => $settings['max_length'],
+    '#required' => FALSE,
+    '#description' => t('The maximum length of the field in characters. Leave blank for an unlimited size.'),
+  );
+
+  return $form;
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function notes_field_field_widget_info() {
+  return array(
+    'notes_field_widget' => array(
+      'label' => t('Notes Field'),
+      'field types' => array('notes_field'),
+      'settings' => array(),
+      'behaviors' => array(
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'default value' => FIELD_BEHAVIOR_DEFAULT,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  $element['note'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Note'),
+  );
+
+  $element[] = array(
+    '#type' => 'submit',
+    '#value' => t('Save Note'),
+  );
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function notes_field_field_formatter_info() {
+  return array(
+    'notes_field_formatter' => array(
+      'label' => t('Notes Field Default'),
+      'field types' => array('notes_field'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+function notes_field_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+  $settings = $display['settings'];
+
+  if ($display['type'] == 'notes_field_formatter') {
+    foreach ($items as $delta => $item) {
+      $element[$delta] = array(
+        '#markup' => $settings['some_setting'] . $item['value']
+      );
+    }
+  }
+
+  return $element;
+}
