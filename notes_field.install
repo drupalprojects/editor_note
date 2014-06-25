@@ -1,0 +1,45 @@
+<?php
+/**
+ * Database schema and installations tasks for Notes Field.
+ */
+
+/**
+ * Implements hook_field_schema().
+ */
+function notes_field_field_schema($field) {
+  if ($field['type'] == 'notes_field') {
+    return array(
+      'columns' => array(
+        'note' => array(
+          'description' => 'Content of a single note.',
+          'type' => 'text',
+          'not null' => FALSE,
+          'size' => 'medium',
+        ),
+        'uid' => array(
+          'description' => 'The {users}.uid that created this note.',
+          'type' => 'int',
+          'not null' => TRUE,
+          'default' => 0,
+        ),
+        'created' => array(
+          'description' => 'A Unix timestamp indicating when this note was created.',
+          'type' => 'int',
+          'not null' => TRUE,
+          'default' => 0,
+        ),
+        'changed' => array(
+          'description' => 'A Unix timestamp indicating when this note was changed.',
+          'type' => 'int',
+          'not null' => TRUE,
+          'default' => 0,
+        ),
+      ),
+      'indexes' => array(
+        'note_uid' => array('uid'),
+        'note_created' => array('created'),
+        'note_changed' => array('changed'),
+      ),
+    );
+  }
+}
