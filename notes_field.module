@@ -11,9 +11,15 @@
 function notes_field_field_info() {
   return array(
     'notes_field' => array(
-      'label' => t('Notes Field'),
+      'label' => t('Notes'),
       'description' => t('Field for taking notes.'),
-      'settings' => array(),
+      'settings' => array(
+        'notes_size' => 3,
+        'notes_maxlength' => 10,
+        'limit_per_entity' => 0,
+        'limit_per_table' => 10,
+        'pager' => TRUE,
+      ),
       'instance_settings' => array(),
       'default_widget' => 'notes_field_widget',
       'default_formatter' => 'notes_field_formatter',
@@ -37,13 +43,51 @@ function notes_field_field_is_empty($item, $field) {
  */
 function notes_field_field_settings_form($field, $instance, $has_data) {
   $settings = $field['settings'];
-  // @todo update hook with rows size
-  $form['max_length'] = array(
+
+  $form['notes_size'] = array(
     '#type' => 'textfield',
-    '#title' => t('Size of textarea'),
-    '#default_value' => $settings['max_length'],
-    '#required' => FALSE,
-    '#description' => t('The maximum length of the field in characters. Leave blank for an unlimited size.'),
+    '#title' => t('Size of Notes field (rows)'),
+    '#default_value' => $settings['notes_size'],
+    '#required' => TRUE,
+    '#description' => t('Specify the visible number of lines in "Note" field.'),
+    '#maxlength' => $settings['notes_maxlength'],
+    '#element_validate' => array('element_validate_integer_positive'),
+  );
+
+  $form['notes_maxlength'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Maximum number of characters user can enter'),
+    '#default_value' => $settings['notes_maxlength'],
+    '#required' => TRUE,
+    '#description' => t('Specifies the maximum number of characters allowed in the text area. Set 0 for no limit.'),
+    '#maxlength' => $settings['notes_maxlength'],
+    '#element_validate' => array('element_validate_integer'),
+  );
+
+  $form['limit_per_entity'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Limit number of notes per entity.'),
+    '#default_value' => $settings['limit_per_entity'],
+    '#required' => TRUE,
+    '#description' => t('Limit number of notes user can enter per entity. Set 0 for no limit.'),
+    '#element_validate' => array('element_validate_integer'),
+  );
+
+  $form['limit_per_table'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Display a specified number of items.'),
+    '#default_value' => $settings['limit_per_table'],
+    '#required' => TRUE,
+    '#description' => t('Display a specified number of items. Set 0 for no limit.'),
+    '#element_validate' => array('element_validate_integer'),
+  );
+
+  $form['pager'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display pager'),
+    '#default_value' => $settings['pager'],
+    '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
+    '#element_validate' => array('element_validate_integer'),
   );
 
   return $form;
@@ -55,11 +99,11 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
 function notes_field_field_widget_info() {
   return array(
     'notes_field_widget' => array(
-      'label' => t('Notes Field'),
+      'label' => t('Notes'),
       'field types' => array('notes_field'),
       'settings' => array(),
       'behaviors' => array(
-        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can only create 1 instance per field.
         'default value' => FIELD_BEHAVIOR_DEFAULT,
       ),
     ),
@@ -89,7 +133,7 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
 function notes_field_field_formatter_info() {
   return array(
     'notes_field_formatter' => array(
-      'label' => t('Notes Field Default'),
+      'label' => t('Notes Default'),
       'field types' => array('notes_field'),
     ),
   );
