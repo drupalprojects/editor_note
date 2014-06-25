@@ -6,6 +6,16 @@
  */
 
 /**
+ * @todo use native field option to limit results.
+ * @todo field with delta 0 is Note field, other fields are disabled from editing.
+ * @todo instead of drag-n-drop field widget has its own theme function which separates field with delta 0
+ * @todo and moves other fields to the table ordered by last updated date DESC.
+ * @todo Investigate and figure out how to theme whole widget containing multivalued fields.
+ * @todo The idea is to get an array of values of the single multivalued field and to output it as
+ * @todo textarea (delta 0) and table (delta >= 1).
+ */
+
+/**
  * Implements hook_field_info().
  */
 function notes_field_field_info() {
@@ -16,7 +26,7 @@ function notes_field_field_info() {
       'settings' => array(
         'notes_size' => 3,
         'notes_maxlength' => 10,
-        'limit_per_entity' => 0,
+        'limit_per_entity' => 0, // @todo use native field api limit for this value.
         'limit_per_table' => 10,
         'pager' => TRUE,
       ),
@@ -32,7 +42,7 @@ function notes_field_field_info() {
  */
 function notes_field_field_is_empty($item, $field) {
   // @todo update hook with actual values.
-  if (empty($item['value']) && $item['value'] !== '0') {
+  if (empty($item['note']) && $item['note'] !== '0') {
     return TRUE;
   }
   return FALSE;
@@ -50,7 +60,6 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#default_value' => $settings['notes_size'],
     '#required' => TRUE,
     '#description' => t('Specify the visible number of lines in "Note" field.'),
-    '#maxlength' => $settings['notes_maxlength'],
     '#element_validate' => array('element_validate_integer_positive'),
   );
 
@@ -60,8 +69,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#default_value' => $settings['notes_maxlength'],
     '#required' => TRUE,
     '#description' => t('Specifies the maximum number of characters allowed in the text area. Set 0 for no limit.'),
-    '#maxlength' => $settings['notes_maxlength'],
-    '#element_validate' => array('element_validate_integer'),
+    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
   );
 
   $form['limit_per_entity'] = array(
@@ -70,7 +78,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#default_value' => $settings['limit_per_entity'],
     '#required' => TRUE,
     '#description' => t('Limit number of notes user can enter per entity. Set 0 for no limit.'),
-    '#element_validate' => array('element_validate_integer'),
+    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
   );
 
   $form['limit_per_table'] = array(
@@ -79,7 +87,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#default_value' => $settings['limit_per_table'],
     '#required' => TRUE,
     '#description' => t('Display a specified number of items. Set 0 for no limit.'),
-    '#element_validate' => array('element_validate_integer'),
+    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
   );
 
   $form['pager'] = array(
@@ -87,10 +95,44 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Display pager'),
     '#default_value' => $settings['pager'],
     '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
-    '#element_validate' => array('element_validate_integer'),
+    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
   );
 
   return $form;
+}
+
+/**
+ * Implements hook_field_validate
+ */
+function notes_field_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+//  foreach ($items as $delta => $item) {
+//    if (!empty($item['value'])) {
+//      if (!empty($field['settings']['max_length']) && drupal_strlen($item['value']) > $field['settings']['max_length']) {
+//        $errors[$field['field_name']][$langcode][$delta][] = array(
+//          'error' => 'text_max_length',
+//          'message' => t('%name: the value may not be longer than %max characters.', array('%name' => $instance['label'], '%max' => $field['settings']['max_length'])),
+//        );
+//      }
+//    }
+//  }
+}
+
+/**
+ * Implements hook_field_presave().
+ */
+function notes_field_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  if ($field['type'] == 'notes_field') {
+    global $user;
+    foreach ($items as $delta => $item) {
+      if (isset($item['note'])) {
+        // Add other properties required and defined in 'Notes Field' schema.
+        // @see notes_field_field_schema().
+        $items[$delta]['uid'] = $user->uid;
+        $items[$delta]['created'] = REQUEST_TIME;
+        $items[$delta]['changed'] = REQUEST_TIME; // @todo define whether note was changed or not.
+      }
+    }
+  }
 }
 
 /**
@@ -103,7 +145,7 @@ function notes_field_field_widget_info() {
       'field types' => array('notes_field'),
       'settings' => array(),
       'behaviors' => array(
-        'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can only create 1 instance per field.
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can create more than 1 field.
         'default value' => FIELD_BEHAVIOR_DEFAULT,
       ),
     ),
@@ -119,12 +161,21 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#title' => t('Note'),
   );
 
-  $element[] = array(
-    '#type' => 'submit',
-    '#value' => t('Save Note'),
-  );
+  if ($delta == 0) {
+    $element['submit'] = array(
+      '#type' => 'submit',
+      '#value' => t('Save Note'),
+    );
+  }
 
   return $element;
+}
+
+/**
+ * Implements hook_field_widget_error().
+ */
+function notes_field_field_widget_error($element, $error, $form, &$form_state) {
+//  form_error($element, $error['message']);
 }
 
 /**
@@ -155,4 +206,19 @@ function notes_field_field_formatter_view($entity_type, $entity, $field, $instan
   }
 
   return $element;
+}
+
+// Helper functions.
+
+/**
+ * Form element validation handler for integer elements that must be positive or 0.
+ *
+ * @param $element
+ * @param $form_state
+ */
+function notes_field_validate_integer_positive_or_zero($element, &$form_state) {
+  $value = $element['#value'];
+  if ($value !== '' && (!is_numeric($value) || intval($value) != $value || $value < 0)) {
+    form_error($element, t('%name must be a positive integer or 0.', array('%name' => $element['#title'])));
+  }
 }
