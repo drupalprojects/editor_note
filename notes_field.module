@@ -13,6 +13,8 @@
  * @todo Investigate and figure out how to theme whole widget containing multivalued fields.
  * @todo The idea is to get an array of values of the single multivalued field and to output it as
  * @todo textarea (delta 0) and table (delta >= 1).
+ * @todo think if cardinality field settings is good enough to replace items_total setting which is more flexible.
+ * @see https://www.commercialprogression.com/post/how-remove-tabledrag-rearranging-multiple-value-field-widgets
  */
 
 /**
@@ -25,8 +27,8 @@ function notes_field_field_info() {
       'description' => t('Field for taking notes.'),
       'settings' => array(
         'notes_size' => 3,
+        'notes_placeholder' => 'Create a note',
         'notes_maxlength' => 10,
-        'limit_per_entity' => 0, // @todo use native field api limit for this value.
         'limit_per_table' => 10,
         'pager' => TRUE,
       ),
@@ -63,21 +65,20 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#element_validate' => array('element_validate_integer_positive'),
   );
 
+  $form['notes_placeholder'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Placeholder for blank Notes field'),
+    '#default_value' => $settings['notes_placeholder'],
+    '#required' => FALSE,
+    '#description' => t('Specifies a short hint that describes the expected value of the text area.'),
+  );
+
   $form['notes_maxlength'] = array(
     '#type' => 'textfield',
     '#title' => t('Maximum number of characters user can enter'),
     '#default_value' => $settings['notes_maxlength'],
     '#required' => TRUE,
     '#description' => t('Specifies the maximum number of characters allowed in the text area. Set 0 for no limit.'),
-    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
-  );
-
-  $form['limit_per_entity'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Limit number of notes per entity.'),
-    '#default_value' => $settings['limit_per_entity'],
-    '#required' => TRUE,
-    '#description' => t('Limit number of notes user can enter per entity. Set 0 for no limit.'),
     '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
   );
 
@@ -145,7 +146,7 @@ function notes_field_field_widget_info() {
       'field types' => array('notes_field'),
       'settings' => array(),
       'behaviors' => array(
-        'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can create more than 1 field.
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can create 2 (? 3) or more fields.
         'default value' => FIELD_BEHAVIOR_DEFAULT,
       ),
     ),
@@ -159,6 +160,11 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
   $element['note'] = array(
     '#type' => 'textarea',
     '#title' => t('Note'),
+    '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
+    '#attributes' => array(
+      'maxlength' => $field['settings']['notes_maxlength'],
+      'placeholder' => t($field['settings']['notes_placeholder']),
+    ),
   );
 
   if ($delta == 0) {
@@ -200,7 +206,7 @@ function notes_field_field_formatter_view($entity_type, $entity, $field, $instan
   if ($display['type'] == 'notes_field_formatter') {
     foreach ($items as $delta => $item) {
       $element[$delta] = array(
-        '#markup' => $settings['some_setting'] . $item['value']
+        '#markup' => $item['note'],
       );
     }
   }
