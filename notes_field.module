@@ -109,8 +109,9 @@ function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
   if ($form['#field']['type'] == 'notes_field') {
     // Update cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
-      drupal_map_assoc(array(10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 500));
-    $form['field']['cardinality']['#default_value'] = -1;
+      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 500));
+    $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
+      $form['field']['cardinality']['#default_value'] : -1;
     $form['field']['cardinality']['#description'] = t('Maximum number of values users can enter for this field.');
   }
 }
@@ -132,23 +133,23 @@ function notes_field_field_validate($entity_type, $entity, $field, $instance, $l
 //  }
 }
 
-///**
-// * Implements hook_field_presave().
-// */
-//function notes_field_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
-//  if ($field['type'] == 'notes_field') {
-//    global $user;
-//    foreach ($items as $delta => $item) {
-//      if (isset($item['note'])) {
-//        // Add other properties required and defined in 'Notes Field' schema.
-//        // @see notes_field_field_schema().
-//        $items[$delta]['uid'] = $user->uid;
-//        $items[$delta]['created'] = REQUEST_TIME;
-//        $items[$delta]['changed'] = REQUEST_TIME; // @todo define whether note was changed or not.
-//      }
-//    }
-//  }
-//}
+/**
+ * Implements hook_field_presave().
+ */
+function notes_field_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  if ($field['type'] == 'notes_field') {
+    global $user;
+    foreach ($items as $delta => $item) {
+      if (isset($item['note'])) {
+        // Set timestamps up to date and update author information.
+        // @todo test and ensure than it is impossible to change author by editing the value of the field.
+        $items[$delta]['uid'] = $user->uid;
+        $items[$delta]['created'] = REQUEST_TIME;
+        $items[$delta]['changed'] = REQUEST_TIME;
+      }
+    }
+  }
+}
 
 /**
  * Implements hook_field_widget_info().
@@ -197,13 +198,6 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#type' => 'hidden',
     '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME,
   );
-
-  if ($delta == 0) {
-    $element['submit'] = array(
-      '#type' => 'submit',
-      '#value' => t('Save Note'),
-    );
-  }
 
   return $element;
 }
@@ -343,11 +337,11 @@ function notes_field_theme_field_multiple_value_form($variables) {
  */
 function notes_field_theme_widget_form($variables, $element) {
   $table_id = drupal_html_id($element['#field_name'] . '_values');
-  // @todo check if element can be required.
+  // @todo check if element can be required and validation should stop from saving empty field.
   $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
   $header = array(
     array(
-      'data' => '<label>' . t('!title !required', array('!title' => $element['#title'], '!required' => $required)) . '</label>',
+      'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
       'class' => array('field-label'),
     ),
     array(
@@ -388,24 +382,32 @@ function notes_field_theme_widget_form($variables, $element) {
         // Blank field for adding new note.
         $empty_item = $item;
         if (isset($empty_item['_weight'])) {
+          $empty_item['note']['#title'] = t('!title !required',
+            array('!title' => $empty_item['note']['#title'], '!required' => $required));
           unset($empty_item['_weight']);
         }
       }
     }
-    elseif ($key == 'add_more') {
-      // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
-      $add_more_button = $element[$key];
-    }
   }
+
+  // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
+  // @todo if cardinality setting present ensure that button doesn't show up.
+  $save_note_button = array(
+    '#type' => 'submit',
+    '#name' => 'field_notes_save_note',
+    '#value' => t('Save Note'),
+  );
 
   krsort($rows_data);
   $rows = array_values($rows_data);
 
   $output = '<div class="form-item">';
   $output .= drupal_render($empty_item);
-  $output .= drupal_render($add_more_button);
+  $output .= drupal_render($save_note_button);
   // @todo add pagination here.
-  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-notes-table'))));
+  if (!empty($rows)) {
+    $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-notes-table'))));
+  }
   $output .= $element['#description'] ? '<div class="description">' . $element['#description'] . '</div>' : '';
   // @todo add pagination here.
   $output .= '</div>';
