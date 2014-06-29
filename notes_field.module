@@ -118,6 +118,7 @@ function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
 /**
  * Implements hook_field_validate().
  */
+// @todo validate so that editor cannot change values in hidden fields manually and then to save field.
 function notes_field_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
 //  foreach ($items as $delta => $item) {
 //    if (!empty($item['value'])) {
@@ -131,23 +132,23 @@ function notes_field_field_validate($entity_type, $entity, $field, $instance, $l
 //  }
 }
 
-/**
- * Implements hook_field_presave().
- */
-function notes_field_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
-  if ($field['type'] == 'notes_field') {
-    global $user;
-    foreach ($items as $delta => $item) {
-      if (isset($item['note'])) {
-        // Add other properties required and defined in 'Notes Field' schema.
-        // @see notes_field_field_schema().
-        $items[$delta]['uid'] = $user->uid;
-        $items[$delta]['created'] = REQUEST_TIME;
-        $items[$delta]['changed'] = REQUEST_TIME; // @todo define whether note was changed or not.
-      }
-    }
-  }
-}
+///**
+// * Implements hook_field_presave().
+// */
+//function notes_field_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
+//  if ($field['type'] == 'notes_field') {
+//    global $user;
+//    foreach ($items as $delta => $item) {
+//      if (isset($item['note'])) {
+//        // Add other properties required and defined in 'Notes Field' schema.
+//        // @see notes_field_field_schema().
+//        $items[$delta]['uid'] = $user->uid;
+//        $items[$delta]['created'] = REQUEST_TIME;
+//        $items[$delta]['changed'] = REQUEST_TIME; // @todo define whether note was changed or not.
+//      }
+//    }
+//  }
+//}
 
 /**
  * Implements hook_field_widget_info().
@@ -170,6 +171,8 @@ function notes_field_field_widget_info() {
  * Implements hook_field_widget_form().
  */
 function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+  global $user;
+
   $element['note'] = array(
     '#type' => 'textarea',
     '#title' => t('Note'),
@@ -178,6 +181,21 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
       'maxlength' => $field['settings']['notes_maxlength'],
       'placeholder' => t($field['settings']['notes_placeholder']),
     ),
+  );
+
+  $element['uid'] = array(
+    '#type' => 'hidden',
+    '#default_value' => isset($items[$delta]['uid']) ? $items[$delta]['uid'] : $user->uid,
+  );
+
+  $element['created'] = array(
+    '#type' => 'hidden',
+    '#default_value' => isset($items[$delta]['created']) ? $items[$delta]['created'] : REQUEST_TIME,
+  );
+
+  $element['changed'] = array(
+    '#type' => 'hidden',
+    '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME,
   );
 
   if ($delta == 0) {
@@ -253,7 +271,7 @@ function notes_field_theme_field_multiple_value_form($variables) {
   $output = '';
 
   if ($variables['element']['#field_name'] == 'field_notes') {
-    // Specify custom function for 'notes' field widget form and leave default functionality for other fields.
+    // Custom function for 'notes' field widget form, field of other types have default functionality.
     // 'Notes' cardinality is always > 1 because 'notes' field makes sense only when at least 2 editors work on material.
     $output .= notes_field_theme_widget_form($variables, $element);
   }
@@ -325,50 +343,71 @@ function notes_field_theme_field_multiple_value_form($variables) {
  */
 function notes_field_theme_widget_form($variables, $element) {
   $table_id = drupal_html_id($element['#field_name'] . '_values');
-  $order_class = $element['#field_name'] . '-delta-order';
+  // @todo check if element can be required.
   $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
-
   $header = array(
     array(
-      'data' => '<label>' . t('!title !required', array('!title' => $element['#title'], '!required' => $required)) . "</label>",
-      'colspan' => 2,
+      'data' => '<label>' . t('!title !required', array('!title' => $element['#title'], '!required' => $required)) . '</label>',
       'class' => array('field-label'),
     ),
-    t('Order'),
+    array(
+      'data' => t('Author'),
+      'class' => array('field-author'),
+    ),
+    array(
+      'data' => t('Created'),
+      'class' => array('field-created'),
+    ),
+    array(
+      'data' => t('Changed'),
+      'class' => array('field-changed'),
+    ),
+    array(
+      'data' => t('Operations'),
+      'class' => array('field-operations'),
+    ),
   );
-  $rows = array();
 
-  // Sort items according to '_weight' (needed when the form comes back after
-  // preview or failed validation)
-  $items = array();
-  foreach (element_children($element) as $key) {
-    if ($key === 'add_more') {
-      $add_more_button = &$element[$key];
+  $rows_data = array();
+  $empty_item = array();
+
+  foreach ($element as $key => $item) {
+    if (is_numeric($key)) {
+      // @todo display other items as table rows with possible hidden values.
+      if (!empty($item['note']['#default_value'])) {
+        $rows_data[$key] = array(
+          'note' => $item['note']['#default_value'],
+          'author' => l(format_username(user_load($item['uid']['#default_value'])), 'user/' . $item['uid']['#default_value']),
+          'changed' => format_date($item['changed']['#default_value'], 'short'),
+          'created' => format_date($item['created']['#default_value'], 'short'),
+          // @todo output as links with appropriate ajax behaviour.
+          'operations' => theme('item_list', array('edit', 'remove')),
+        );
+      }
+      else {
+        // Blank field for adding new note.
+        $empty_item = $item;
+        if (isset($empty_item['_weight'])) {
+          unset($empty_item['_weight']);
+        }
+      }
     }
-    else {
-      $items[] = &$element[$key];
+    elseif ($key == 'add_more') {
+      // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
+      $add_more_button = $element[$key];
     }
   }
-  usort($items, '_field_sort_items_value_helper');
 
-  // Add the items as table rows.
-  foreach ($items as $key => $item) {
-    $item['_weight']['#attributes']['class'] = array($order_class);
-    $delta_element = drupal_render($item['_weight']);
-    $cells = array(
-      array('data' => '', 'class' => array('field-multiple-drag')),
-      drupal_render($item),
-      array('data' => $delta_element, 'class' => array('delta-order')),
-    );
-    $rows[] = array(
-      'data' => $cells,
-    );
-  }
+  krsort($rows_data);
+  $rows = array_values($rows_data);
 
   $output = '<div class="form-item">';
-  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-multiple-table'))));
+  $output .= drupal_render($empty_item);
+  $output .= drupal_render($add_more_button);
+  // @todo add pagination here.
+  $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-notes-table'))));
   $output .= $element['#description'] ? '<div class="description">' . $element['#description'] . '</div>' : '';
-  $output .= '<div class="clearfix">' . drupal_render($add_more_button) . '</div>';
+  // @todo add pagination here.
   $output .= '</div>';
 
   return $output;
