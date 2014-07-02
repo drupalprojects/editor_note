@@ -14,6 +14,7 @@
  * @todo The idea is to get an array of values of the single multivalued field and to output it as
  * @todo textarea (delta 0) and table (delta >= 1).
  * @todo think if cardinality field settings is good enough to replace items_total setting which is more flexible.
+ * @todo think about field permissions
  * @see https://www.commercialprogression.com/post/how-remove-tabledrag-rearranging-multiple-value-field-widgets
  */
 
@@ -29,7 +30,7 @@ function notes_field_field_info() {
         'notes_size' => 3,
         'notes_placeholder' => 'Create a note',
         'notes_maxlength' => 10,
-        'limit_per_table' => 10,
+        'limit_per_table' => 10, // @todo implement sorting ASC / DESC in both formatter and widget
         'pager' => TRUE,
       ),
       'instance_settings' => array(),
@@ -109,7 +110,7 @@ function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
   if ($form['#field']['type'] == 'notes_field') {
     // Update cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
-      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 500));
+      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
     $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
       $form['field']['cardinality']['#default_value'] : -1;
     $form['field']['cardinality']['#description'] = t('Maximum number of values users can enter for this field.');
@@ -120,6 +121,7 @@ function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
  * Implements hook_field_validate().
  */
 // @todo validate so that editor cannot change values in hidden fields manually and then to save field.
+// @todo check field on preview and validation.
 function notes_field_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
 //  foreach ($items as $delta => $item) {
 //    if (!empty($item['value'])) {
@@ -143,9 +145,9 @@ function notes_field_field_presave($entity_type, $entity, $field, $instance, $la
       if (isset($item['note'])) {
         // Set timestamps up to date and update author information.
         // @todo test and ensure than it is impossible to change author by editing the value of the field.
-        $items[$delta]['uid'] = $user->uid;
-        $items[$delta]['created'] = REQUEST_TIME;
-        $items[$delta]['changed'] = REQUEST_TIME;
+        $items[$delta]['uid'] = !empty($items[$delta]['uid']) ? $items[$delta]['uid'] : $user->uid;
+        $items[$delta]['created'] = !empty($items[$delta]['created']) ? $items[$delta]['created'] : REQUEST_TIME;
+        $items[$delta]['changed'] = !empty($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME; // @todo how to track changes?
       }
     }
   }
@@ -172,8 +174,6 @@ function notes_field_field_widget_info() {
  * Implements hook_field_widget_form().
  */
 function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  global $user;
-
   $element['note'] = array(
     '#type' => 'textarea',
     '#title' => t('Note'),
@@ -186,18 +186,20 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
 
   $element['uid'] = array(
     '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['uid']) ? $items[$delta]['uid'] : $user->uid,
+    '#default_value' => isset($items[$delta]['uid']) ? $items[$delta]['uid'] : '',
   );
 
   $element['created'] = array(
     '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['created']) ? $items[$delta]['created'] : REQUEST_TIME,
+    '#default_value' => isset($items[$delta]['created']) ? $items[$delta]['created'] : '',
   );
 
   $element['changed'] = array(
     '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME,
+    '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : '',
   );
+
+  $element['#attached']['js'][] = drupal_get_path('module', 'notes_field') . '/js/notes_field.js';
 
   return $element;
 }
@@ -336,6 +338,7 @@ function notes_field_theme_field_multiple_value_form($variables) {
  * @param $element
  */
 function notes_field_theme_widget_form($variables, $element) {
+  global $user;
   $table_id = drupal_html_id($element['#field_name'] . '_values');
   // @todo check if element can be required and validation should stop from saving empty field.
   $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
@@ -367,15 +370,30 @@ function notes_field_theme_widget_form($variables, $element) {
 
   foreach ($element as $key => $item) {
     if (is_numeric($key)) {
-      // @todo display other items as table rows with possible hidden values.
       if (!empty($item['note']['#default_value'])) {
+        $delta = $item['_weight']['#default_value'];
+        $item['note']['#type'] = 'hidden';
+        $item['note']['#theme'] = 'hidden';
+        unset($item['note']['#title']);
+        unset($item['note']['#attributes']);
+        $item['_weight']['#attributes']['class'][] = 'element-invisible';
+        $operations = ($user->uid != $item['uid']['#default_value'] && $user->uid != 1) ? '' : theme('item_list',
+                      array(
+                        'items' => array(
+                          l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $delta))),
+                          l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $delta))),
+                        )
+                      )
+                    );
         $rows_data[$key] = array(
-          'note' => $item['note']['#default_value'],
-          'author' => l(format_username(user_load($item['uid']['#default_value'])), 'user/' . $item['uid']['#default_value']),
-          'changed' => format_date($item['changed']['#default_value'], 'short'),
-          'created' => format_date($item['created']['#default_value'], 'short'),
-          // @todo output as links with appropriate ajax behaviour.
-          'operations' => theme('item_list', array('edit', 'remove')),
+          'data' => array(
+            'note' => '<div class="note">' . $item['note']['#default_value'] . '</div>' . drupal_render($item['note']) . drupal_render($item['_weight']),
+            'author' => l(format_username(user_load($item['uid']['#default_value'])), 'user/' . $item['uid']['#default_value']),
+            'changed' => format_date($item['changed']['#default_value'], 'short'),
+            'created' => format_date($item['created']['#default_value'], 'short'),
+            'operations' => $operations,
+          ),
+          'class' => array('note-' . $delta),
         );
       }
       else {
@@ -384,7 +402,8 @@ function notes_field_theme_widget_form($variables, $element) {
         if (isset($empty_item['_weight'])) {
           $empty_item['note']['#title'] = t('!title !required',
             array('!title' => $empty_item['note']['#title'], '!required' => $required));
-          unset($empty_item['_weight']);
+          $empty_item['note']['#attributes']['class'][] = 'add-note';
+          unset($empty_item['_weight']); // @todo keep weight?
         }
       }
     }
@@ -392,10 +411,10 @@ function notes_field_theme_widget_form($variables, $element) {
 
   // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
   // @todo if cardinality setting present ensure that button doesn't show up.
-  $save_note_button = array(
+  $add_note_button = array(
     '#type' => 'submit',
     '#name' => 'field_notes_save_note',
-    '#value' => t('Save Note'),
+    '#value' => t('Add Note'),
   );
 
   krsort($rows_data);
@@ -403,7 +422,7 @@ function notes_field_theme_widget_form($variables, $element) {
 
   $output = '<div class="form-item">';
   $output .= drupal_render($empty_item);
-  $output .= drupal_render($save_note_button);
+  $output .= drupal_render($add_note_button);
   // @todo add pagination here.
   if (!empty($rows)) {
     $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-notes-table'))));
