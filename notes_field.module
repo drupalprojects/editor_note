@@ -6,16 +6,9 @@
  */
 
 /**
- * @todo use native field option to limit results.
- * @todo field with delta 0 is Note field, other fields are disabled from editing.
- * @todo instead of drag-n-drop field widget has its own theme function which separates field with delta 0
- * @todo and moves other fields to the table ordered by last updated date DESC.
- * @todo Investigate and figure out how to theme whole widget containing multivalued fields.
- * @todo The idea is to get an array of values of the single multivalued field and to output it as
  * @todo textarea (delta 0) and table (delta >= 1).
- * @todo think if cardinality field settings is good enough to replace items_total setting which is more flexible.
  * @todo think about field permissions
- * @see https://www.commercialprogression.com/post/how-remove-tabledrag-rearranging-multiple-value-field-widgets
+ * @todo check how it works with multiple languages
  */
 
 /**
@@ -29,7 +22,7 @@ function notes_field_field_info() {
       'settings' => array(
         'notes_size' => 3,
         'notes_placeholder' => 'Create a note',
-        'notes_maxlength' => 10,
+        'notes_maxlength' => 0, // @todo test if it works in IE and perform server-side validation
         'limit_per_table' => 10, // @todo implement sorting ASC / DESC in both formatter and widget
         'pager' => TRUE,
       ),
@@ -199,6 +192,8 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : '',
   );
 
+  $setting = array('notesFieldName' => $field['field_name'], 'notesFieldLang' => LANGUAGE_NONE);
+  $element['#attached']['js'][] = array('type' => 'setting', 'data' => $setting);
   $element['#attached']['js'][] = drupal_get_path('module', 'notes_field') . '/js/notes_field.js';
 
   return $element;
@@ -265,8 +260,8 @@ function notes_field_field_formatter_view($entity_type, $entity, $field, $instan
 function notes_field_theme_field_multiple_value_form($variables) {
   $element = $variables['element'];
   $output = '';
-
-  if ($variables['element']['#field_name'] == 'field_notes') {
+  $field = field_info_field($variables['element']['#field_name']);
+  if ($field['type'] == 'notes_field') {
     // Custom function for 'notes' field widget form, field of other types have default functionality.
     // 'Notes' cardinality is always > 1 because 'notes' field makes sense only when at least 2 editors work on material.
     $output .= notes_field_theme_widget_form($variables, $element);
@@ -370,13 +365,14 @@ function notes_field_theme_widget_form($variables, $element) {
 
   foreach ($element as $key => $item) {
     if (is_numeric($key)) {
+      $item['_weight']['#attributes']['class'][] = 'element-invisible';
+
       if (!empty($item['note']['#default_value'])) {
         $delta = $item['_weight']['#default_value'];
         $item['note']['#type'] = 'hidden';
         $item['note']['#theme'] = 'hidden';
         unset($item['note']['#title']);
         unset($item['note']['#attributes']);
-        $item['_weight']['#attributes']['class'][] = 'element-invisible';
         $operations = ($user->uid != $item['uid']['#default_value'] && $user->uid != 1) ? '' : theme('item_list',
                       array(
                         'items' => array(
@@ -397,13 +393,15 @@ function notes_field_theme_widget_form($variables, $element) {
         );
       }
       else {
-        // Blank field for adding new note.
+        // @todo if cardinality setting present ensure that textarea doesn't show up.
+        // @todo blank field for adding new note.
         $empty_item = $item;
         if (isset($empty_item['_weight'])) {
+          // @todo ensure that note title is the same as field name.
           $empty_item['note']['#title'] = t('!title !required',
             array('!title' => $empty_item['note']['#title'], '!required' => $required));
           $empty_item['note']['#attributes']['class'][] = 'add-note';
-          unset($empty_item['_weight']); // @todo keep weight?
+          $empty_item['note']['#description'] = isset($element['#description']) ? $element['#description'] : '';
         }
       }
     }
@@ -413,7 +411,7 @@ function notes_field_theme_widget_form($variables, $element) {
   // @todo if cardinality setting present ensure that button doesn't show up.
   $add_note_button = array(
     '#type' => 'submit',
-    '#name' => 'field_notes_save_note',
+    '#name' => $element['#field_name'] . '_save_note',
     '#value' => t('Add Note'),
   );
 
@@ -427,7 +425,6 @@ function notes_field_theme_widget_form($variables, $element) {
   if (!empty($rows)) {
     $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-notes-table'))));
   }
-  $output .= $element['#description'] ? '<div class="description">' . $element['#description'] . '</div>' : '';
   // @todo add pagination here.
   $output .= '</div>';
 
