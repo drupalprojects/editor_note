@@ -1,6 +1,7 @@
 (function ($) {
   Drupal.behaviors.notesField = {
     attach: function(context) {
+      // @todo notesFieldName will not work for 2 field of note_field type in one form.
       var notesFieldName = Drupal.settings.notesFieldName;
       var notesFieldLang = Drupal.settings.notesFieldLang;
 
@@ -26,7 +27,7 @@
         var noteTrSelector = 'tr.note-' + delta;
         var noteHiddenName = notesFieldName + '[' + notesFieldLang + '][' + delta + '][note]';
         $('input[name="' + noteHiddenName + '"]').val('');
-        $(noteTrSelector).hide();
+        $(noteTrSelector).addClass('element-invisible');
           // @todo rebuild after that odd|even classes
 //        var tr = $(noteTrSelector).parent().find('tr');
 //        tr.each(function() {

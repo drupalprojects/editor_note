@@ -169,10 +169,10 @@ function notes_field_field_widget_info() {
 function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   $element['note'] = array(
     '#type' => 'textarea',
-    '#title' => t('Note'),
+    '#title' => $instance['label'],
     '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
     '#attributes' => array(
-      'maxlength' => $field['settings']['notes_maxlength'],
+      'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
       'placeholder' => t($field['settings']['notes_placeholder']),
     ),
   );
@@ -266,63 +266,9 @@ function notes_field_theme_field_multiple_value_form($variables) {
     // 'Notes' cardinality is always > 1 because 'notes' field makes sense only when at least 2 editors work on material.
     $output .= notes_field_theme_widget_form($variables, $element);
   }
-  elseif ($element['#cardinality'] > 1 || $element['#cardinality'] == FIELD_CARDINALITY_UNLIMITED) {
-    $table_id = drupal_html_id($element['#field_name'] . '_values');
-    $order_class = $element['#field_name'] . '-delta-order';
-    $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
-
-    $header = array(
-      array(
-        'data' => '<label>' . t('!title !required', array('!title' => $element['#title'], '!required' => $required)) . "</label>",
-        'colspan' => 2,
-        'class' => array('field-label'),
-      ),
-      t('Order'),
-    );
-    $rows = array();
-
-    // Sort items according to '_weight' (needed when the form comes back after
-    // preview or failed validation)
-    $items = array();
-    foreach (element_children($element) as $key) {
-      if ($key === 'add_more') {
-        $add_more_button = &$element[$key];
-      }
-      else {
-        $items[] = &$element[$key];
-      }
-    }
-    usort($items, '_field_sort_items_value_helper');
-
-    // Add the items as table rows.
-    foreach ($items as $key => $item) {
-      $item['_weight']['#attributes']['class'] = array($order_class);
-      $delta_element = drupal_render($item['_weight']);
-      $cells = array(
-        array('data' => '', 'class' => array('field-multiple-drag')),
-        drupal_render($item),
-        array('data' => $delta_element, 'class' => array('delta-order')),
-      );
-      $rows[] = array(
-        'data' => $cells,
-        'class' => array('draggable'),
-      );
-    }
-
-    $output = '<div class="form-item">';
-    $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-multiple-table'))));
-    $output .= $element['#description'] ? '<div class="description">' . $element['#description'] . '</div>' : '';
-    $output .= '<div class="clearfix">' . drupal_render($add_more_button) . '</div>';
-    $output .= '</div>';
-
-    drupal_add_tabledrag($table_id, 'order', 'sibling', $order_class);
-  }
   else {
-    foreach (element_children($element) as $key) {
-      $output .= drupal_render($element[$key]);
-    }
+    $output = theme_field_multiple_value_form($variables);
   }
-
   return $output;
 }
 
@@ -337,6 +283,7 @@ function notes_field_theme_widget_form($variables, $element) {
   $table_id = drupal_html_id($element['#field_name'] . '_values');
   // @todo check if element can be required and validation should stop from saving empty field.
   $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
+  $add_note_button = array();
   $header = array(
     array(
       'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
@@ -397,23 +344,22 @@ function notes_field_theme_widget_form($variables, $element) {
         // @todo blank field for adding new note.
         $empty_item = $item;
         if (isset($empty_item['_weight'])) {
-          // @todo ensure that note title is the same as field name.
           $empty_item['note']['#title'] = t('!title !required',
             array('!title' => $empty_item['note']['#title'], '!required' => $required));
           $empty_item['note']['#attributes']['class'][] = 'add-note';
           $empty_item['note']['#description'] = isset($element['#description']) ? $element['#description'] : '';
         }
+
+        // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
+        // @todo if cardinality setting present ensure that button doesn't show up.
+        $add_note_button = array(
+          '#type' => 'submit',
+          '#name' => $element['#field_name'] . '_save_note',
+          '#value' => t('Add Note'),
+        );
       }
     }
   }
-
-  // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
-  // @todo if cardinality setting present ensure that button doesn't show up.
-  $add_note_button = array(
-    '#type' => 'submit',
-    '#name' => $element['#field_name'] . '_save_note',
-    '#value' => t('Add Note'),
-  );
 
   krsort($rows_data);
   $rows = array_values($rows_data);
