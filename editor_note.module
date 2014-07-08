@@ -15,9 +15,9 @@
 /**
  * Implements hook_entity_info().
  */
-function notes_field_entity_info() {
+function editor_note_entity_info() {
   $entity = array(
-    'note' => array(
+    'editor_note' => array(
       'label' => t('Note'),
       'entity class' => 'Entity',
       'controller class' => 'EntityAPIController',
@@ -35,42 +35,42 @@ function notes_field_entity_info() {
 /**
  * Implements hook_entity_property_info().
  */
-function mvpd_log_entity_property_info() {
+function editor_note_entity_property_info() {
   $properties = array(
     'id' => array(
       'type'  => 'integer',
-      'label' => t('Note ID'),
-      'description' => t('Unique Note ID.'),
+      'label' => t('Editor Note ID'),
+      'description' => t('Unique editor note ID.'),
       'schema field' => 'id',
     ),
     'note' => array(
       'type'  => 'text',
-      'label' => t('Note'),
-      'description' => t('Text of note.'),
+      'label' => t('Editor Note'),
+      'description' => t('Content of editor note.'),
       'schema field' => 'note',
     ),
     'entity_type' => array(
       'type' => 'text',
       'label' => t('Entity Type'),
-      'description' => 'The entity type note is attached to.',
+      'description' => 'The entity type editor note is attached to.',
       'schema field' => 'entity_type',
     ),
     'entity_id' => array(
       'type' => 'int',
       'label' => t('Entity ID'),
-      'description' => 'The entity id note is attached to.',
+      'description' => 'The entity id editor note is attached to.',
       'schema field' => 'entity_type',
     ),
     'revision_id' => array(
       'type' => 'int',
       'label' => t('Revision ID'),
-      'description' => 'The entity revision id this data is attached to, or NULL if the entity type is not versioned.',
+      'description' => 'The entity revision editor note is attached to.',
       'schema field' => 'revision_id',
     ),
     'uid' => array(
       'type'  => 'integer',
       'label' => t('Author UID'),
-      'description' => t('The unique ID of the user who authored the note.'),
+      'description' => t('The unique ID of the user who authored editor note.'),
       'schema field' => 'uid',
     ),
     'created' => array(
@@ -93,13 +93,47 @@ function mvpd_log_entity_property_info() {
 }
 
 /**
+ * Saves Editor Note.
+ *
+ * @param $note
+ * @param $entity_type
+ * @param $entity
+ * @param null $uid
+ * @param null $created
+ * @param null $changed
+ */
+function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = NULL, $changed = NULL) {
+  list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
+  if (!isset($revision_id)) {
+    $revision_id = $entity_id;
+  }
+  if (!isset($uid)) {
+    global $user;
+    $uid = $user->uid;
+  }
+  $editor_note = entity_create(
+    'editor_note', array(
+      'note' => $note,
+      'bundle' => $bundle,
+      'entity_type' => $entity_type,
+      'entity_id' => $entity_id,
+      'revision_id' => $revision_id,
+      'uid' => (int) $uid,
+      'created' => isset($created) ? $created : REQUEST_TIME,
+      'changed' => isset($changed) ? $changed : REQUEST_TIME,
+    )
+  );
+  entity_save('editor_note', $editor_note);
+}
+
+/**
  * Implements hook_field_info().
  */
-function notes_field_field_info() {
+function editor_note_field_field_info() {
   return array(
-    'notes_field' => array(
-      'label' => t('Notes'),
-      'description' => t('Field for taking notes.'),
+    'editor_note' => array(
+      'label' => t('Editor Notes'),
+      'description' => t('Field for taking editor notes.'),
       'settings' => array(
         'notes_size' => 3,
         'notes_placeholder' => 'Create a note',
@@ -108,8 +142,8 @@ function notes_field_field_info() {
         'pager' => TRUE,
       ),
       'instance_settings' => array(),
-      'default_widget' => 'notes_field_widget',
-      'default_formatter' => 'notes_field_formatter',
+      'default_widget' => 'editor_note_field_widget',
+      'default_formatter' => 'editor_note_field_formatter',
     ),
   );
 }
@@ -181,7 +215,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
  * Implements hook_form_FORM_ID_alter().
  */
 function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
-  if ($form['#field']['type'] == 'notes_field') {
+  if ($form['#field']['type'] == 'editor_note') {
     // Update cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
       drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
@@ -232,9 +266,9 @@ function notes_field_field_presave($entity_type, $entity, $field, $instance, $la
  */
 function notes_field_field_widget_info() {
   return array(
-    'notes_field_widget' => array(
-      'label' => t('Notes'),
-      'field types' => array('notes_field'),
+    'editor_note_field_widget' => array(
+      'label' => t('Editor Notes'),
+      'field types' => array('editor_note'),
       'settings' => array(),
       'behaviors' => array(
         'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can create 2 (? 3) or more fields.

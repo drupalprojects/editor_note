@@ -1,14 +1,14 @@
 <?php
 /**
- * Database schema and installations tasks for Notes Field.
+ * Database schema and installations tasks for Editor Notes module.
  */
 
 /**
  * Implements hook_schema().
  */
-function notes_field_schema() {
-  $schema['note'] = array(
-    'description' => 'Base table for notes.',
+function editor_note_schema() {
+  $schema['editor_note'] = array(
+    'description' => 'Base table for editor notes.',
     'fields' => array(
       'id' => array(
         'type' => 'serial',
@@ -19,7 +19,7 @@ function notes_field_schema() {
         'type' => 'text',
         'not null' => TRUE,
         'size' => 'big',
-        'description' => 'Content of a note.',
+        'description' => 'Content of an note.',
       ),
       'entity_type' => array(
         'type' => 'varchar',
@@ -27,6 +27,13 @@ function notes_field_schema() {
         'not null' => TRUE,
         'default' => '',
         'description' => 'The entity type note is attached to.',
+      ),
+      'bundle' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The bundle of the entity note is attached to.',
       ),
       'entity_id' => array(
         'type' => 'int',
@@ -38,7 +45,7 @@ function notes_field_schema() {
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => FALSE,
-        'description' => 'The entity revision id this data is attached to, or NULL if the entity type is not versioned.',
+        'description' => 'The entity revision id note is attached to, or NULL if the entity type is not versioned.',
       ),
       'uid' => array(
         'type' => 'int',
@@ -61,9 +68,9 @@ function notes_field_schema() {
     ),
     'primary key' => array('id'),
     'indexes' => array(
-      'note_nid' => array('nid'),
-      'note_uid' => array('uid'),
-      'note_created' => array('created'),
+      'editor_note_nid' => array('nid'),
+      'editor_note_uid' => array('uid'),
+      'editor_note_created' => array('created'),
     ),
   );
 
