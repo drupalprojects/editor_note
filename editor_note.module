@@ -18,14 +18,14 @@
 function editor_note_entity_info() {
   $entity = array(
     'editor_note' => array(
-      'label' => t('Note'),
+      'label' => t('Editor Note'),
       'entity class' => 'Entity',
       'controller class' => 'EntityAPIController',
-      'base table' => 'note',
+      'base table' => 'editor_note',
       'entity keys' => array(
         'id' => 'id',
       ),
-      'module' => 'notes_field',
+      'module' => 'editor_note',
     ),
   );
 
@@ -335,11 +335,11 @@ function notes_field_field_widget_error($element, $error, $form, &$form_state) {
 /**
  * Implements hook_field_formatter_info().
  */
-function notes_field_field_formatter_info() {
+function editor_note_field_formatter_info() {
   return array(
-    'notes_field_formatter' => array(
-      'label' => t('Notes Default'),
-      'field types' => array('notes_field'),
+    'editor_note_field_formatter' => array(
+      'label' => t('Editor Notes Table'),
+      'field types' => array('editor_note'),
     ),
   );
 }
@@ -347,11 +347,11 @@ function notes_field_field_formatter_info() {
 /**
  * Implements hook_field_formatter_view().
  */
-function notes_field_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
   $settings = $display['settings'];
 
-  if ($display['type'] == 'notes_field_formatter') {
+  if ($display['type'] == 'editor_note_field_formatter') {
     foreach ($items as $delta => $item) {
       $element[$delta] = array(
         '#markup' => $item['note'],
