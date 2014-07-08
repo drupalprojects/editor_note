@@ -4,42 +4,68 @@
  */
 
 /**
- * Implements hook_field_schema().
+ * Implements hook_schema().
  */
-function notes_field_field_schema($field) {
-  if ($field['type'] == 'notes_field') {
-    return array(
-      'columns' => array(
-        'note' => array(
-          'description' => 'Content of a single note.',
-          'type' => 'text',
-          'not null' => FALSE,
-          'size' => 'medium',
-        ),
-        'uid' => array(
-          'description' => 'The {users}.uid that created this note.',
-          'type' => 'int',
-          'not null' => TRUE,
-          'default' => 0,
-        ),
-        'created' => array(
-          'description' => 'A Unix timestamp indicating when this note was created.',
-          'type' => 'int',
-          'not null' => TRUE,
-          'default' => 0,
-        ),
-        'changed' => array(
-          'description' => 'A Unix timestamp indicating when this note was changed.',
-          'type' => 'int',
-          'not null' => TRUE,
-          'default' => 0,
-        ),
+function notes_field_schema() {
+  $schema['note'] = array(
+    'description' => 'Base table for notes.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: unique note id.',
       ),
-      'indexes' => array(
-        'note_uid' => array('uid'),
-        'note_created' => array('created'),
-        'note_changed' => array('changed'),
+      'note' => array(
+        'type' => 'text',
+        'not null' => TRUE,
+        'size' => 'big',
+        'description' => 'Content of a note.',
       ),
-    );
-  }
+      'entity_type' => array(
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The entity type note is attached to.',
+      ),
+      'entity_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'description' => 'The entity id note is attached to.',
+      ),
+      'revision_id' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'description' => 'The entity revision id this data is attached to, or NULL if the entity type is not versioned.',
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {users}.uid who authored the comment.',
+      ),
+      'created' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The time that the note was created, as a Unix timestamp.',
+      ),
+      'changed' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The time that the note was last edited, as a Unix timestamp.',
+      ),
+    ),
+    'primary key' => array('id'),
+    'indexes' => array(
+      'note_nid' => array('nid'),
+      'note_uid' => array('uid'),
+      'note_created' => array('created'),
+    ),
+  );
+
+  return $schema;
 }
