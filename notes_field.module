@@ -8,8 +8,89 @@
 /**
  * @todo textarea (delta 0) and table (delta >= 1).
  * @todo think about field permissions
- * @todo check how it works with multiple languages
+ * @todo test with multiple languages
+ * @todo test with revisions
  */
+
+/**
+ * Implements hook_entity_info().
+ */
+function notes_field_entity_info() {
+  $entity = array(
+    'note' => array(
+      'label' => t('Note'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'note',
+      'entity keys' => array(
+        'id' => 'id',
+      ),
+      'module' => 'notes_field',
+    ),
+  );
+
+  return $entity;
+}
+
+/**
+ * Implements hook_entity_property_info().
+ */
+function mvpd_log_entity_property_info() {
+  $properties = array(
+    'id' => array(
+      'type'  => 'integer',
+      'label' => t('Note ID'),
+      'description' => t('Unique Note ID.'),
+      'schema field' => 'id',
+    ),
+    'note' => array(
+      'type'  => 'text',
+      'label' => t('Note'),
+      'description' => t('Text of note.'),
+      'schema field' => 'note',
+    ),
+    'entity_type' => array(
+      'type' => 'text',
+      'label' => t('Entity Type'),
+      'description' => 'The entity type note is attached to.',
+      'schema field' => 'entity_type',
+    ),
+    'entity_id' => array(
+      'type' => 'int',
+      'label' => t('Entity ID'),
+      'description' => 'The entity id note is attached to.',
+      'schema field' => 'entity_type',
+    ),
+    'revision_id' => array(
+      'type' => 'int',
+      'label' => t('Revision ID'),
+      'description' => 'The entity revision id this data is attached to, or NULL if the entity type is not versioned.',
+      'schema field' => 'revision_id',
+    ),
+    'uid' => array(
+      'type'  => 'integer',
+      'label' => t('Author UID'),
+      'description' => t('The unique ID of the user who authored the note.'),
+      'schema field' => 'uid',
+    ),
+    'created' => array(
+      'type' => 'int',
+      'label' => t('Created'),
+      'description' => 'The time that the note was created.',
+      'schema field' => 'created',
+    ),
+    'changed' => array(
+      'type' => 'int',
+      'label' => t('Changed'),
+      'description' => 'The time that the note was last edited.',
+      'schema field' => 'changed',
+    ),
+  );
+
+  $info['note']['properties'] = $properties;
+
+  return $info;
+}
 
 /**
  * Implements hook_field_info().

@@ -44,7 +44,7 @@ function notes_field_schema() {
         'type' => 'int',
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {users}.uid who authored the comment.',
+        'description' => 'The {users}.uid who authored the note.',
       ),
       'created' => array(
         'type' => 'int',
