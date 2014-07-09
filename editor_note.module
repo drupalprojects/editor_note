@@ -241,24 +241,10 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
     ),
   );
 
-  $element['uid'] = array(
+  $element['id'] = array(
     '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['uid']) ? $items[$delta]['uid'] : '',
+    '#default_value' => isset($items[$delta]['id']) ? $items[$delta]['id'] : '',
   );
-
-  $element['created'] = array(
-    '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['created']) ? $items[$delta]['created'] : '',
-  );
-
-  $element['changed'] = array(
-    '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : '',
-  );
-
-//  $setting = array('notesFieldName' => $field['field_name'], 'notesFieldLang' => LANGUAGE_NONE);
-//  $element['#attached']['js'][] = array('type' => 'setting', 'data' => $setting);
-//  $element['#attached']['js'][] = drupal_get_path('module', 'editor_note') . '/js/editor_note.js';
 
   return $element;
 }
@@ -367,8 +353,13 @@ function editor_note_theme_field_multiple_value_form($variables) {
  */
 function editor_note_theme_widget_form($variables, $element) {
   $add_note_field = $element[0];
+  if (isset($add_note_field['_weight'])) {
+    // Hide $items['_weight'] from display.
+    $add_note_field['_weight']['#attributes']['class'][] = 'element-invisible';
+  }
   $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
-  if (!empty($required)) {
+  if ($required) {
+    // Add required mark to the title of 'Add Note' field.
     $add_note_field['note']['#title'] .= $required;
   }
   $notes = array_values(editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity']));
@@ -582,6 +573,8 @@ function editor_note_get_formatted_notes($variables, $notes) {
       )
     )
   );
+
+  // @todo implement pager.
 
   return $formatted_notes;
 }
