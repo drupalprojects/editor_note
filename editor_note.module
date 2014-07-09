@@ -366,107 +366,26 @@ function editor_note_theme_field_multiple_value_form($variables) {
  * @param $element
  */
 function editor_note_theme_widget_form($variables, $element) {
-//  dpm($variables);
-
-  $notes_data = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity']);
-  dpm($notes_data);
-
-  global $user;
-  $table_id = drupal_html_id($element['#field_name'] . '_values');
-  // @todo check if element can be required and validation should stop from saving empty field.
-  $required = !empty($element['#required']) ? theme('form_required_marker', $variables) : '';
-  $add_note_button = array();
-  $header = array(
-    array(
-      'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
-      'class' => array('field-label'),
-    ),
-    array(
-      'data' => t('Author'),
-      'class' => array('field-author'),
-    ),
-    array(
-      'data' => t('Created'),
-      'class' => array('field-created'),
-    ),
-    array(
-      'data' => t('Changed'),
-      'class' => array('field-changed'),
-    ),
-    array(
-      'data' => t('Operations'),
-      'class' => array('field-operations'),
-    ),
+  $add_note_field = $element[0];
+  $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
+  if (!empty($required)) {
+    $add_note_field['note']['#title'] .= $required;
+  }
+  $notes = array_values(editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity']));
+  $formatted_notes = editor_note_get_formatted_notes($variables, $notes);
+  // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
+  // @todo if cardinality setting present ensure that button doesn't show up.
+  $add_note_button = array(
+    '#type' => 'submit',
+    '#name' => $element['#field_name'] . '_save_note',
+    '#value' => t('Add Note'),
   );
 
-  $rows_data = array();
-  $empty_item = array();
-
-  foreach ($element as $key => $item) {
-    if (is_numeric($key)) {
-      $item['_weight']['#attributes']['class'][] = 'element-invisible';
-
-      if (!empty($item['note']['#default_value'])) {
-        $delta = $item['_weight']['#default_value'];
-        $item['note']['#type'] = 'hidden';
-        $item['note']['#theme'] = 'hidden';
-        unset($item['note']['#title']);
-        unset($item['note']['#attributes']);
-        $operations = ($user->uid != $item['uid']['#default_value'] && $user->uid != 1) ? '' : theme('item_list',
-                      array(
-                        'items' => array(
-                          l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $delta))),
-                          l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $delta))),
-                        )
-                      )
-                    );
-        $rows_data[$key] = array(
-          'data' => array(
-            'note' => '<div class="note">' . $item['note']['#default_value'] . '</div>' . drupal_render($item['note']) . drupal_render($item['_weight']),
-            'author' => l(format_username(user_load($item['uid']['#default_value'])), 'user/' . $item['uid']['#default_value']),
-            'changed' => format_date($item['changed']['#default_value'], 'short'),
-            'created' => format_date($item['created']['#default_value'], 'short'),
-            'operations' => $operations,
-          ),
-          'class' => array('note-' . $delta),
-        );
-      }
-      else {
-        // @todo if cardinality setting present ensure that textarea doesn't show up.
-        // @todo blank field for adding new note.
-        $empty_item = $item;
-        if (isset($empty_item['_weight'])) {
-          $empty_item['note']['#title'] = t('!title !required',
-            array('!title' => $empty_item['note']['#title'], '!required' => $required));
-          $empty_item['note']['#attributes']['class'][] = 'add-note';
-          $empty_item['note']['#description'] = isset($element['#description']) ? $element['#description'] : '';
-        }
-
-        // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
-        // @todo if cardinality setting present ensure that button doesn't show up.
-        $add_note_button = array(
-          '#type' => 'submit',
-          '#name' => $element['#field_name'] . '_save_note',
-          '#value' => t('Add Note'),
-        );
-      }
-    }
-  }
-
-  krsort($rows_data);
-  $rows = array_values($rows_data);
-
-  $output = '<div class="form-item">';
-  $output .= drupal_render($empty_item);
+  $output = drupal_render($add_note_field);
   $output .= drupal_render($add_note_button);
-  // @todo add pagination here.
-  if (!empty($rows)) {
-    $output .= theme('table', array('header' => $header, 'rows' => $rows, 'attributes' => array('id' => $table_id, 'class' => array('field-notes-table'))));
-  }
-  // @todo add pagination here.
-  $output .= '</div>';
+  $output .= $formatted_notes;
 
-  return $output;
+  return '<div class="form-item">' . $output . '</div>';
 }
 
 /**
@@ -569,6 +488,102 @@ function editor_note_get_notes($entity_type, $entity) {
   )->fetchAllAssoc('id');
 
   return $notes;
+}
+
+/**
+ * Returns formatted notes table.
+ *
+ * @param $notes
+ *
+ * @return string
+ */
+function editor_note_get_formatted_notes($variables, $notes) {
+  global $user;
+
+  $element = $variables['element'];
+  $table_id = drupal_html_id($element['#field_name'] . '_values');
+
+  $header = array(
+    array(
+      'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
+      'class' => array('field-label'),
+    ),
+    array(
+      'data' => t('Author'),
+      'class' => array('field-author'),
+    ),
+    array(
+      'data' => t('Created'),
+      'class' => array('field-created'),
+    ),
+    array(
+      'data' => t('Changed'),
+      'class' => array('field-changed'),
+    ),
+    array(
+      'data' => t('Operations'),
+      'class' => array('field-operations'),
+    ),
+  );
+
+  $rows_data = array();
+  $counter = 0;
+
+  // @todo check if element can be required and validation should stop from saving empty field.
+  // @todo check if user may access user profiles
+
+  foreach ($notes as $note_id => $item) {
+    $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
+      array(
+        'items' => array(
+          l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
+          l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
+        )
+      )
+    );
+    $rows_data[$counter] = array(
+      'data' => array(
+        'note' => array(
+          'data' => $item->note,
+          'class' => array('note'),
+        ),
+        'author' => array(
+          'data' => l(format_username(user_load($item->uid)), 'user/' . $item->uid),
+          'class' => array('author'),
+        ),
+        'changed' => array(
+          'data' => format_date($item->changed, 'short'),
+          'class' => array('changed'),
+        ),
+        'created' => array(
+          'data' => format_date($item->created, 'short'),
+          'class' => array('created'),
+        ),
+        'operations' => array(
+          'data' => $operations,
+          'class' => array('operations'),
+        ),
+      ),
+      'class' => array('note-' . $note_id),
+    );
+    $counter++;
+  }
+
+  $rows = $rows_data;
+
+  $formatted_notes = theme(
+    'table',
+    array(
+      'header' => $header,
+      'rows' => $rows,
+      'attributes' => array(
+        'id' => $table_id,
+        'class' => array('field-notes-table')
+      )
+    )
+  );
+
+  return $formatted_notes;
 }
 
 /**
