@@ -105,8 +105,11 @@ function editor_note_field_info() {
         'notes_size' => 3,
         'notes_placeholder' => 'Create a note',
         'notes_maxlength' => 0, // @todo test if it works in IE and perform server-side validation
-        'limit_per_table' => 10, // @todo implement sorting ASC / DESC in both formatter and widget
-        'pager' => TRUE,
+        'limit' => 10,
+        'order' => 'DESC',
+        'display' => 1,
+        'pager' => 1,
+        'pager_display' => 1,
       ),
       'instance_settings' => array(),
       'default_widget' => 'editor_note_field_widget',
@@ -158,13 +161,31 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
 
-  $form['limit_per_table'] = array(
+  $form['limit'] = array(
     '#type' => 'textfield',
     '#title' => t('Display a specified number of items.'),
-    '#default_value' => $settings['limit_per_table'],
+    '#default_value' => $settings['limit'],
     '#required' => TRUE,
     '#description' => t('Display a specified number of items. Set 0 for no limit.'),
     '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
+  );
+
+  $form['order'] = array(
+    '#type' => 'radios',
+    '#title' => t('Order Notes'),
+    '#options' => array(
+      'DESC' => t('Display new notes first'),
+      'ASC' => t('Display old notes first'),
+    ),
+    '#default_value' => $settings['order'],
+    '#description' => t('Set order of notes in the table.'),
+  );
+
+  $form['display'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Textarea above notes table'),
+    '#default_value' => $settings['display'],
+    '#description' => t('Display "Create a note" field above the notes table. Otherwise it will be shown below the notes table.'),
   );
 
   $form['pager'] = array(
@@ -172,8 +193,26 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Display pager'),
     '#default_value' => $settings['pager'],
     '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
-    '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
+
+  // @todo implement #states to hide pager when limit = 0
+
+  $form['pager'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Display pager'),
+    '#default_value' => $settings['pager'],
+    '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
+  );
+
+  $form['pager_display'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Pager below notes table'),
+    '#default_value' => $settings['pager_display'],
+    '#description' => t('Display pager below the notes table. Otherwise it will be shown above the notes table.'),
+  );
+
+  // @todo implement #states to hide pager_display when pager = 0
+  // @todo add validation so that user cannot add pager and set limit 0 at the same time.
 
   return $form;
 }
@@ -331,12 +370,11 @@ function editor_note_theme_registry_alter(&$theme_registry) {
  */
 function editor_note_theme_field_multiple_value_form($variables) {
   $element = $variables['element'];
-  $output = '';
-  $field = field_info_field($variables['element']['#field_name']);
-  if ($field['type'] == 'editor_note') {
+  $field_info = field_info_field($variables['element']['#field_name']);
+  if ($field_info['type'] == 'editor_note') {
     // Custom function for 'notes' field widget form, field of other types have default functionality.
     // 'Notes' cardinality is always > 1 because 'notes' field makes sense only when at least 2 editors work on material.
-    $output .= editor_note_theme_widget_form($variables, $element);
+    $output = editor_note_theme_widget_form($variables, $element);
   }
   else {
     // Otherwise use default theme function.
@@ -350,8 +388,12 @@ function editor_note_theme_field_multiple_value_form($variables) {
  *
  * @param $variables
  * @param $element
+ *
+ * @return string
  */
 function editor_note_theme_widget_form($variables, $element) {
+  $field_info = field_info_field($element['#field_name']);
+
   $add_note_field = $element[0];
   if (isset($add_note_field['_weight'])) {
     // Hide $items['_weight'] from display.
@@ -362,7 +404,13 @@ function editor_note_theme_widget_form($variables, $element) {
     // Add required mark to the title of 'Add Note' field.
     $add_note_field['note']['#title'] .= $required;
   }
-  $notes = array_values(editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity']));
+  $notes = editor_note_get_notes(
+    $element[0]['#entity_type'],
+    $element[0]['#entity'],
+    $field_info['settings']['limit'],
+    $field_info['settings']['pager'],
+    $field_info['settings']['order']
+  );
   $formatted_notes = editor_note_get_formatted_notes($variables, $notes);
   // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
   // @todo if cardinality setting present ensure that button doesn't show up.
@@ -372,11 +420,20 @@ function editor_note_theme_widget_form($variables, $element) {
     '#value' => t('Add Note'),
   );
 
-  $output = drupal_render($add_note_field);
-  $output .= drupal_render($add_note_button);
-  $output .= $formatted_notes;
+  $output = array();
 
-  return '<div class="form-item">' . $output . '</div>';
+  if ($field_info['settings']['display'] == 0) {
+    $output[] = $formatted_notes;
+    $output[] = drupal_render($add_note_field);
+    $output[] = drupal_render($add_note_button);
+  }
+  else {
+    $output[] = drupal_render($add_note_field);
+    $output[] = drupal_render($add_note_button);
+    $output[] = $formatted_notes;
+  }
+
+  return '<div class="form-item">' . implode('', $output) . '</div>';
 }
 
 /**
@@ -465,18 +522,29 @@ function editor_note_delete_multiple($note_ids) {
  *
  * @return array
  */
-function editor_note_get_notes($entity_type, $entity) {
+function editor_note_get_notes($entity_type, $entity, $limit = 10, $pager = TRUE, $order = 'DESC') {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
-  $notes = db_query(
-    'SELECT * FROM {editor_note} en WHERE en.entity_type = :entity_type AND en.entity_id = :entity_id AND
-    en.bundle = :bundle AND en.revision_id = :revision_id',
-    array(
-      ':entity_type' => $entity_type,
-      ':entity_id' => (int) $entity_id,
-      ':bundle' => $bundle,
-      ':revision_id' => (int) $revision_id,
-    )
-  )->fetchAllAssoc('id');
+
+  $query = db_select('editor_note', 'en');
+
+  if ($limit > 0) {
+    if ($pager) {
+      $query = $query->extend('PagerDefault');
+      $query->limit($limit);
+    }
+    else {
+      $query->range(0, $limit);
+    }
+  }
+
+  $query->fields('en', array('id', 'note', 'entity_type', 'bundle', 'entity_id', 'revision_id', 'uid', 'created', 'changed'))
+    ->condition('en.entity_type', $entity_type, '=')
+    ->condition('en.entity_id', $entity_id, '=')
+    ->condition('en.bundle', $bundle, '=')
+    ->condition('en.revision_id', $revision_id, '=')
+    ->orderBy('en.created', $order);
+
+  $notes = $query->execute()->fetchAllAssoc('id');
 
   return $notes;
 }
@@ -574,7 +642,8 @@ function editor_note_get_formatted_notes($variables, $notes) {
     )
   );
 
-  // @todo implement pager.
+  $formatted_notes .= theme('pager');
+  // @todo set position of the pager depending on appropriate checkbox
 
   return $formatted_notes;
 }
