@@ -94,40 +94,6 @@ function editor_note_entity_property_info() {
 }
 
 /**
- * Saves Editor Note.
- *
- * @param $note
- * @param $entity_type
- * @param $entity
- * @param null $uid
- * @param null $created
- * @param null $changed
- */
-function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = NULL, $changed = NULL) {
-  list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
-  if (!isset($revision_id)) {
-    $revision_id = $entity_id;
-  }
-  if (!isset($uid)) {
-    global $user;
-    $uid = $user->uid;
-  }
-  $editor_note = entity_create(
-    'editor_note', array(
-      'note' => $note,
-      'bundle' => $bundle,
-      'entity_type' => $entity_type,
-      'entity_id' => $entity_id,
-      'revision_id' => $revision_id,
-      'uid' => (int) $uid,
-      'created' => isset($created) ? $created : REQUEST_TIME,
-      'changed' => isset($changed) ? $changed : REQUEST_TIME,
-    )
-  );
-  entity_save('editor_note', $editor_note);
-}
-
-/**
  * Implements hook_field_info().
  */
 function editor_note_field_info() {
@@ -245,24 +211,6 @@ function editor_note_field_validate($entity_type, $entity, $field, $instance, $l
 }
 
 /**
- * Implements hook_field_presave().
- */
-function editor_note_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
-//  if ($field['type'] == 'editor_note') {
-//    global $user;
-//    foreach ($items as $delta => $item) {
-//      if (isset($item['note'])) {
-//        // Set timestamps up to date and update author information.
-//        // @todo test and ensure than it is impossible to change author by editing the value of the field.
-//        $items[$delta]['uid'] = !empty($items[$delta]['uid']) ? $items[$delta]['uid'] : $user->uid;
-//        $items[$delta]['created'] = !empty($items[$delta]['created']) ? $items[$delta]['created'] : REQUEST_TIME;
-//        $items[$delta]['changed'] = !empty($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME; // @todo how to track changes?
-//      }
-//    }
-//  }
-}
-
-/**
  * Implements hook_field_widget_info().
  */
 function editor_note_field_widget_info() {
@@ -318,8 +266,32 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
 /**
  * Implements hook_field_widget_error().
  */
-function notes_field_field_widget_error($element, $error, $form, &$form_state) {
+function editor_note_field_widget_error($element, $error, $form, &$form_state) {
 //  form_error($element, $error['message']);
+}
+
+/**
+ * Implements hook_field_insert().
+ * Executes once on adding new entity to the database.
+ */
+function editor_note_field_insert($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  if ($field['type'] == 'editor_note') {
+    foreach ($items as $item) {
+      editor_note_save($item['note'], $entity_type, $entity);
+    }
+  }
+}
+
+/**
+ * Implements hook_field_update().
+ * Executes every time entity gets updated.
+ */
+function editor_note_field_update($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  if ($field['type'] == 'editor_note') {
+    foreach ($items as $item) {
+      editor_note_save($item['note'], $entity_type, $entity);
+    }
+  }
 }
 
 /**
@@ -490,6 +462,40 @@ function editor_note_theme_widget_form($variables, $element) {
   $output .= '</div>';
 
   return $output;
+}
+
+/**
+ * Saves Editor Note.
+ *
+ * @param $note
+ * @param $entity_type
+ * @param $entity
+ * @param null $uid
+ * @param null $created
+ * @param null $changed
+ */
+function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = NULL, $changed = NULL) {
+  list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
+  if (!isset($revision_id)) {
+    $revision_id = $entity_id;
+  }
+  if (!isset($uid)) {
+    global $user;
+    $uid = $user->uid;
+  }
+  $editor_note = entity_create(
+    'editor_note', array(
+      'note' => $note,
+      'bundle' => $bundle,
+      'entity_type' => $entity_type,
+      'entity_id' => $entity_id,
+      'revision_id' => $revision_id,
+      'uid' => (int) $uid,
+      'created' => isset($created) ? $created : REQUEST_TIME,
+      'changed' => isset($changed) ? $changed : REQUEST_TIME,
+    )
+  );
+  entity_save('editor_note', $editor_note);
 }
 
 /**
