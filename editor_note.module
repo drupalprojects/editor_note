@@ -366,6 +366,11 @@ function editor_note_theme_field_multiple_value_form($variables) {
  * @param $element
  */
 function editor_note_theme_widget_form($variables, $element) {
+//  dpm($variables);
+
+  $notes_data = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity']);
+  dpm($notes_data);
+
   global $user;
   $table_id = drupal_html_id($element['#field_name'] . '_values');
   // @todo check if element can be required and validation should stop from saving empty field.
@@ -496,6 +501,74 @@ function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = 
     )
   );
   entity_save('editor_note', $editor_note);
+}
+
+/**
+ * Loads single Editor Note based on certain conditions.
+ *
+ * @param $note_id
+ * @param array $conditions
+ * @param bool $reset
+ *
+ * @return mixed
+ */
+function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
+  return entity_load('editor_note', array($note_id), $conditions, $reset);
+}
+
+/**
+ * Loads multiple Editor Notes based on certain conditions.
+ *
+ * @param $note_ids
+ * @param array $conditions
+ * @param bool $reset
+ *
+ * @return mixed
+ */
+function editor_note_load_multiple($note_ids, $conditions = array(), $reset = FALSE) {
+  return entity_load('editor_note', $note_ids, $conditions, $reset);
+}
+
+/**
+ * Deletes single Editor Notes.
+ *
+ * @param $note_id
+ */
+function editor_note_delete($note_id) {
+  entity_delete('editor_note', $note_id);
+}
+
+/**
+ * Deletes multiple Editor Notes.
+ *
+ * @param $note_ids
+ */
+function editor_note_delete_multiple($note_ids) {
+  entity_delete_multiple('editor_note', $note_ids);
+}
+
+/**
+ * Returns array of notes per entity revision.
+ *
+ * @param $entity_type
+ * @param $entity
+ *
+ * @return array
+ */
+function editor_note_get_notes($entity_type, $entity) {
+  list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
+  $notes = db_query(
+    'SELECT * FROM {editor_note} en WHERE en.entity_type = :entity_type AND en.entity_id = :entity_id AND
+    en.bundle = :bundle AND en.revision_id = :revision_id',
+    array(
+      ':entity_type' => $entity_type,
+      ':entity_id' => (int) $entity_id,
+      ':bundle' => $bundle,
+      ':revision_id' => (int) $revision_id,
+    )
+  )->fetchAllAssoc('id');
+
+  return $notes;
 }
 
 /**
