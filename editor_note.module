@@ -6,7 +6,8 @@
  */
 
 /**
- * @todo textarea (delta 0) and table (delta >= 1).
+ * @todo textarea (delta 0) and table (delta >= 1)
+ * @todo check on /node/add/ - should not be possible to add notes via ajax on empty node
  * @todo think about field permissions
  * @todo test with multiple languages
  * @todo test with revisions
@@ -129,7 +130,7 @@ function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = 
 /**
  * Implements hook_field_info().
  */
-function editor_note_field_field_info() {
+function editor_note_field_info() {
   return array(
     'editor_note' => array(
       'label' => t('Editor Notes'),
@@ -151,7 +152,7 @@ function editor_note_field_field_info() {
 /**
  * Implements hook_field_is_empty().
  */
-function notes_field_field_is_empty($item, $field) {
+function editor_note_field_is_empty($item, $field) {
   // @todo update hook with actual values.
   if (empty($item['note']) && $item['note'] !== '0') {
     return TRUE;
@@ -162,7 +163,7 @@ function notes_field_field_is_empty($item, $field) {
 /**
  * Implements hook_field_settings_form().
  */
-function notes_field_field_settings_form($field, $instance, $has_data) {
+function editor_note_field_settings_form($field, $instance, $has_data) {
   $settings = $field['settings'];
 
   $form['notes_size'] = array(
@@ -170,7 +171,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Size of Notes field (rows)'),
     '#default_value' => $settings['notes_size'],
     '#required' => TRUE,
-    '#description' => t('Specify the visible number of lines in "Note" field.'),
+    '#description' => t('Specify the visible number of lines in textarea for adding note.'),
     '#element_validate' => array('element_validate_integer_positive'),
   );
 
@@ -179,7 +180,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Placeholder for blank Notes field'),
     '#default_value' => $settings['notes_placeholder'],
     '#required' => FALSE,
-    '#description' => t('Specifies a short hint that describes the expected value of the text area.'),
+    '#description' => t('Specifies a short hint that describes the expected value of the textarea.'),
   );
 
   $form['notes_maxlength'] = array(
@@ -187,8 +188,8 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Maximum number of characters user can enter'),
     '#default_value' => $settings['notes_maxlength'],
     '#required' => TRUE,
-    '#description' => t('Specifies the maximum number of characters allowed in the text area. Set 0 for no limit.'),
-    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
+    '#description' => t('Specifies the maximum number of characters allowed in the textarea. Set 0 for no limit.'),
+    '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
 
   $form['limit_per_table'] = array(
@@ -197,7 +198,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#default_value' => $settings['limit_per_table'],
     '#required' => TRUE,
     '#description' => t('Display a specified number of items. Set 0 for no limit.'),
-    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
+    '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
 
   $form['pager'] = array(
@@ -205,7 +206,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Display pager'),
     '#default_value' => $settings['pager'],
     '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
-    '#element_validate' => array('notes_field_validate_integer_positive_or_zero'),
+    '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
 
   return $form;
@@ -214,7 +215,7 @@ function notes_field_field_settings_form($field, $instance, $has_data) {
 /**
  * Implements hook_form_FORM_ID_alter().
  */
-function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
+function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
     // Update cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
@@ -230,7 +231,7 @@ function notes_field_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
  */
 // @todo validate so that editor cannot change values in hidden fields manually and then to save field.
 // @todo check field on preview and validation.
-function notes_field_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
 //  foreach ($items as $delta => $item) {
 //    if (!empty($item['value'])) {
 //      if (!empty($field['settings']['max_length']) && drupal_strlen($item['value']) > $field['settings']['max_length']) {
@@ -246,25 +247,25 @@ function notes_field_field_validate($entity_type, $entity, $field, $instance, $l
 /**
  * Implements hook_field_presave().
  */
-function notes_field_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
-  if ($field['type'] == 'notes_field') {
-    global $user;
-    foreach ($items as $delta => $item) {
-      if (isset($item['note'])) {
-        // Set timestamps up to date and update author information.
-        // @todo test and ensure than it is impossible to change author by editing the value of the field.
-        $items[$delta]['uid'] = !empty($items[$delta]['uid']) ? $items[$delta]['uid'] : $user->uid;
-        $items[$delta]['created'] = !empty($items[$delta]['created']) ? $items[$delta]['created'] : REQUEST_TIME;
-        $items[$delta]['changed'] = !empty($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME; // @todo how to track changes?
-      }
-    }
-  }
+function editor_note_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
+//  if ($field['type'] == 'editor_note') {
+//    global $user;
+//    foreach ($items as $delta => $item) {
+//      if (isset($item['note'])) {
+//        // Set timestamps up to date and update author information.
+//        // @todo test and ensure than it is impossible to change author by editing the value of the field.
+//        $items[$delta]['uid'] = !empty($items[$delta]['uid']) ? $items[$delta]['uid'] : $user->uid;
+//        $items[$delta]['created'] = !empty($items[$delta]['created']) ? $items[$delta]['created'] : REQUEST_TIME;
+//        $items[$delta]['changed'] = !empty($items[$delta]['changed']) ? $items[$delta]['changed'] : REQUEST_TIME; // @todo how to track changes?
+//      }
+//    }
+//  }
 }
 
 /**
  * Implements hook_field_widget_info().
  */
-function notes_field_field_widget_info() {
+function editor_note_field_widget_info() {
   return array(
     'editor_note_field_widget' => array(
       'label' => t('Editor Notes'),
@@ -281,7 +282,7 @@ function notes_field_field_widget_info() {
 /**
  * Implements hook_field_widget_form().
  */
-function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   $element['note'] = array(
     '#type' => 'textarea',
     '#title' => $instance['label'],
@@ -307,22 +308,11 @@ function notes_field_field_widget_form(&$form, &$form_state, $field, $instance, 
     '#default_value' => isset($items[$delta]['changed']) ? $items[$delta]['changed'] : '',
   );
 
-  $setting = array('notesFieldName' => $field['field_name'], 'notesFieldLang' => LANGUAGE_NONE);
-  $element['#attached']['js'][] = array('type' => 'setting', 'data' => $setting);
-  $element['#attached']['js'][] = drupal_get_path('module', 'notes_field') . '/js/notes_field.js';
+//  $setting = array('notesFieldName' => $field['field_name'], 'notesFieldLang' => LANGUAGE_NONE);
+//  $element['#attached']['js'][] = array('type' => 'setting', 'data' => $setting);
+//  $element['#attached']['js'][] = drupal_get_path('module', 'editor_note') . '/js/editor_note.js';
 
   return $element;
-}
-
-/**
- * Implements hook_theme_registry_alter().
- */
-function notes_field_theme_registry_alter(&$theme_registry) {
-  if (isset($theme_registry['field_multiple_value_form'])) {
-    $theme_registry['field_multiple_value_form']['type'] = 'module';
-    $theme_registry['field_multiple_value_form']['theme path'] = drupal_get_path('module', ' notes_field');
-    $theme_registry['field_multiple_value_form']['function'] =  'notes_field_theme_field_multiple_value_form';
-  }
 }
 
 /**
@@ -362,7 +352,16 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
   return $element;
 }
 
-// Helper functions.
+/**
+ * Implements hook_theme_registry_alter().
+ */
+function editor_note_theme_registry_alter(&$theme_registry) {
+  if (isset($theme_registry['field_multiple_value_form'])) {
+    $theme_registry['field_multiple_value_form']['type'] = 'module';
+    $theme_registry['field_multiple_value_form']['theme path'] = drupal_get_path('module', ' notes_field');
+    $theme_registry['field_multiple_value_form']['function'] =  'editor_note_theme_field_multiple_value_form';
+  }
+}
 
 /**
  * Overrides multiple-value form widget for 'notes' field widget form.
@@ -372,16 +371,17 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
  *
  * @return array
  */
-function notes_field_theme_field_multiple_value_form($variables) {
+function editor_note_theme_field_multiple_value_form($variables) {
   $element = $variables['element'];
   $output = '';
   $field = field_info_field($variables['element']['#field_name']);
-  if ($field['type'] == 'notes_field') {
+  if ($field['type'] == 'editor_note') {
     // Custom function for 'notes' field widget form, field of other types have default functionality.
     // 'Notes' cardinality is always > 1 because 'notes' field makes sense only when at least 2 editors work on material.
-    $output .= notes_field_theme_widget_form($variables, $element);
+    $output .= editor_note_theme_widget_form($variables, $element);
   }
   else {
+    // Otherwise use default theme function.
     $output = theme_field_multiple_value_form($variables);
   }
   return $output;
@@ -393,7 +393,7 @@ function notes_field_theme_field_multiple_value_form($variables) {
  * @param $variables
  * @param $element
  */
-function notes_field_theme_widget_form($variables, $element) {
+function editor_note_theme_widget_form($variables, $element) {
   global $user;
   $table_id = drupal_html_id($element['#field_name'] . '_values');
   // @todo check if element can be required and validation should stop from saving empty field.
@@ -498,7 +498,7 @@ function notes_field_theme_widget_form($variables, $element) {
  * @param $element
  * @param $form_state
  */
-function notes_field_validate_integer_positive_or_zero($element, &$form_state) {
+function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   $value = $element['#value'];
   if ($value !== '' && (!is_numeric($value) || intval($value) != $value || $value < 0)) {
     form_error($element, t('%name must be a positive integer or 0.', array('%name' => $element['#title'])));
