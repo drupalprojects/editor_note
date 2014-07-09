@@ -109,7 +109,7 @@ function editor_note_field_info() {
         'order' => 'DESC',
         'display' => 1,
         'pager' => 1,
-        'pager_display' => 1,
+        'pager_below' => 1,
       ),
       'instance_settings' => array(),
       'default_widget' => 'editor_note_field_widget',
@@ -204,10 +204,10 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
   );
 
-  $form['pager_display'] = array(
+  $form['pager_below'] = array(
     '#type' => 'checkbox',
     '#title' => t('Pager below notes table'),
-    '#default_value' => $settings['pager_display'],
+    '#default_value' => $settings['pager_below'],
     '#description' => t('Display pager below the notes table. Otherwise it will be shown above the notes table.'),
   );
 
@@ -411,7 +411,7 @@ function editor_note_theme_widget_form($variables, $element) {
     $field_info['settings']['pager'],
     $field_info['settings']['order']
   );
-  $formatted_notes = editor_note_get_formatted_notes($variables, $notes);
+  $formatted_notes = editor_note_get_formatted_notes($variables, $field_info, $notes);
   // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
   // @todo if cardinality setting present ensure that button doesn't show up.
   $add_note_button = array(
@@ -556,7 +556,7 @@ function editor_note_get_notes($entity_type, $entity, $limit = 10, $pager = TRUE
  *
  * @return string
  */
-function editor_note_get_formatted_notes($variables, $notes) {
+function editor_note_get_formatted_notes($variables, $field_info, $notes) {
   global $user;
 
   $element = $variables['element'];
@@ -585,7 +585,7 @@ function editor_note_get_formatted_notes($variables, $notes) {
     ),
   );
 
-  $rows_data = array();
+  $rows = array();
   $counter = 0;
 
   // @todo check if element can be required and validation should stop from saving empty field.
@@ -600,7 +600,7 @@ function editor_note_get_formatted_notes($variables, $notes) {
         )
       )
     );
-    $rows_data[$counter] = array(
+    $rows[$counter] = array(
       'data' => array(
         'note' => array(
           'data' => $item->note,
@@ -628,9 +628,7 @@ function editor_note_get_formatted_notes($variables, $notes) {
     $counter++;
   }
 
-  $rows = $rows_data;
-
-  $formatted_notes = theme(
+  $notes_table = theme(
     'table',
     array(
       'header' => $header,
@@ -642,8 +640,8 @@ function editor_note_get_formatted_notes($variables, $notes) {
     )
   );
 
-  $formatted_notes .= theme('pager');
-  // @todo set position of the pager depending on appropriate checkbox
+  $formatted_notes = $field_info['settings']['pager_below'] == 1 ?
+    ($notes_table . theme('pager')) : (theme('pager') . $notes_table);
 
   return $formatted_notes;
 }
