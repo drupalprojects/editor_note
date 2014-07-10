@@ -12,6 +12,7 @@
  * @todo test with multiple languages
  * @todo test with revisions
  * @todo field throws error on its deletion
+ * @todo add README.txt and hook_help
  */
 
 /**
@@ -160,7 +161,7 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
   $form['notes_placeholder'] = array(
     '#type' => 'textfield',
     '#title' => t('Placeholder for blank Notes field'),
-    '#default_value' => $settings['notes_placeholder'],
+    '#default_value' => t($settings['notes_placeholder']),
     '#required' => FALSE,
     '#description' => t('Specifies a short hint that describes the expected value of the textarea.'),
   );
@@ -186,10 +187,10 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
 
   $form['order'] = array(
     '#type' => 'radios',
-    '#title' => t('Order Notes'),
+    '#title' => t('Notes Ordering'),
     '#options' => array(
-      'DESC' => t('Display new notes first'),
-      'ASC' => t('Display old notes first'),
+      'DESC' => t('display new notes first'),
+      'ASC' => t('display old notes first'),
     ),
     '#default_value' => $settings['order'],
     '#description' => t('Set order of notes in the table.'),
@@ -342,7 +343,7 @@ function editor_note_field_widget_error($element, $error, $form, &$form_state) {
 function editor_note_field_insert($entity_type, $entity, $field, $instance, $langcode, &$items) {
   if ($field['type'] == 'editor_note') {
     foreach ($items as $item) {
-      editor_note_save($item['note'], $entity_type, $entity);
+      editor_note_save($item['note'], $entity_type, $entity, $field['field_name']);
     }
   }
 }
@@ -366,8 +367,17 @@ function editor_note_field_update($entity_type, $entity, $field, $instance, $lan
 function editor_note_field_formatter_info() {
   return array(
     'editor_note_field_formatter' => array(
-      'label' => t('Editor Notes Table'),
+      'label' => t('Editor Notes table'),
       'field types' => array('editor_note'),
+      'settings' => array(
+        'limit' => 10,
+        'order' => 'DESC',
+        'display' => 1,
+        'pager' => array(
+          'enabled' => 1,
+          'pager_below' => 1,
+        ),
+      ),
     ),
   );
 }
@@ -382,10 +392,92 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
   $element = array();
 
   if ($display['type'] == 'editor_note_field_formatter') {
-    // @todo add field_formatter_settings_form.
+    $element['limit'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Display a specified number of items.'),
+      '#default_value' => $settings['limit'],
+      '#required' => TRUE,
+      '#description' => t('Display a specified number of items in table. Set 0 for no limit.'),
+      '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
+    );
+
+    $element['order'] = array(
+      '#type' => 'radios',
+      '#title' => t('Order Notes'),
+      '#options' => array(
+        'DESC' => t('Display new notes first'),
+        'ASC' => t('Display old notes first'),
+      ),
+      '#default_value' => $settings['order'],
+      '#description' => t('Set order of notes in the table.'),
+    );
+
+    $element['display'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Textarea above notes table'),
+      '#default_value' => $settings['display'],
+      '#description' => t('Display "Create a note" field above the notes table. Otherwise it will be shown below the notes table.'),
+    );
+
+    $element['pager'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Pagination'),
+      '#collapsed' => FALSE,
+      '#collapsible' => FALSE,
+      '#states' => array(
+        'invisible' => array(
+          'input[name="fields[' . $field['field_name'] . '][settings_edit_form][settings][limit]"]' => array('value' => 0),
+        ),
+      ),
+    );
+
+    $element['pager']['enabled'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Enable pagination'),
+      '#default_value' => $settings['pager']['enabled'],
+      '#description' => t('Whether to display pagination if number of notes added is greater that can be displayed.'),
+    );
+
+    $element['pager']['pager_below'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Pagination below notes table'),
+      '#default_value' => $settings['pager']['pager_below'],
+      '#description' => t('Displays pagination below the notes table, if unchecked pagination displays above the table.'),
+      '#states' => array(
+        'invisible' => array(
+          'input[name="fields[' . $field['field_name'] . '][settings_edit_form][settings][pager][enabled]"]' => array('checked' => FALSE),
+        ),
+      ),
+    );
   }
 
   return $element;
+}
+
+/**
+ * Implements hook_field_formatter_settings_summary().
+ * Displays summary of enabled settings for the field on Manage Display page.
+ * Essential for proper work of hook_field_formatter_settings_form() because it adds
+ * ajax-powered button that opens formatter_settings_form.
+ * Note that button is present only if this hook returns non empty value.
+ * @see field_ui_display_overview_form().
+ */
+function editor_note_field_formatter_settings_summary($field, $instance, $view_mode) {
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+  $summary = array();
+
+  if ($display['type'] == 'editor_note_field_formatter') {
+    $summary[] = t('Display a specified number of items') . ': ' . $display['settings']['limit'];
+    $summary[] = t('Notes Ordering') . ': ' . ($settings['order'] == 'DESC' ? t('display new notes first') : t('display old notes first'));
+    $summary[] = t('Textarea above notes table') . ': ' . ($settings['display'] ? 'true' : 'false');
+    if ($display['settings']['limit'] > 0) {
+      $summary[] = t('Enable pagination') . ': ' . ($settings['pager']['enabled'] ? 'true' : 'false');
+      $summary[] = t('Pagination below notes table') . ': ' . ($settings['pager']['pager_below'] ? 'true' : 'false');
+    }
+  }
+
+  return !empty($summary) ? implode('<br />', $summary) : '';
 }
 
 /**
@@ -419,7 +511,7 @@ function editor_note_theme_registry_alter(&$theme_registry) {
 
 /**
  * Overrides multiple-value form widget for 'notes' field widget form.
- * @see theme_field_multiple_value_form()
+ * @see theme_field_multiple_value_form().
  *
  * @param $variables
  *
