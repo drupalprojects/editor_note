@@ -11,6 +11,7 @@
  * @todo think about field permissions
  * @todo test with multiple languages
  * @todo test with revisions
+ * @todo field throws error on its deletion
  */
 
 /**
@@ -108,8 +109,10 @@ function editor_note_field_info() {
         'limit' => 10,
         'order' => 'DESC',
         'display' => 1,
-        'pager' => 1,
-        'pager_below' => 1,
+        'pager' => array(
+          'enabled' => 1,
+          'pager_below' => 1,
+        ),
       ),
       'instance_settings' => array(),
       'default_widget' => 'editor_note_field_widget',
@@ -164,7 +167,8 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Display a specified number of items.'),
     '#default_value' => $settings['limit'],
     '#required' => TRUE,
-    '#description' => t('Display a specified number of items. Set 0 for no limit.'),
+    '#description' => t('Display a specified number of items. Set 0 for no limit.
+    Keep in mind that "Number of values" field has more priority here.'),
     '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
 
@@ -187,30 +191,35 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
   );
 
   $form['pager'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Display pager'),
-    '#default_value' => $settings['pager'],
-    '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
+    '#type' => 'fieldset',
+    '#title' => t('Pagination'),
+    '#collapsed' => FALSE,
+    '#collapsible' => FALSE,
+    '#states' => array(
+      'invisible' => array(
+        'input[name="field[settings][limit]"]' => array('value' => 0),
+      ),
+    ),
   );
 
-  // @todo implement #states to hide pager when limit = 0
-
-  $form['pager'] = array(
+  $form['pager']['enabled'] = array(
     '#type' => 'checkbox',
-    '#title' => t('Display pager'),
-    '#default_value' => $settings['pager'],
-    '#description' => t('Whether to display pager if number of notes added is greater that can be displayed.'),
+    '#title' => t('Enable pagination'),
+    '#default_value' => $settings['pager']['enabled'],
+    '#description' => t('Whether to display pagination if number of notes added is greater that can be displayed.'),
   );
 
-  $form['pager_below'] = array(
+  $form['pager']['pager_below'] = array(
     '#type' => 'checkbox',
-    '#title' => t('Pager below notes table'),
-    '#default_value' => $settings['pager_below'],
-    '#description' => t('Display pager below the notes table. Otherwise it will be shown above the notes table.'),
+    '#title' => t('Pagination below notes table'),
+    '#default_value' => $settings['pager']['pager_below'],
+    '#description' => t('Displays pagination below the notes table, if unchecked pagination displays above the table.'),
+    '#states' => array(
+      'invisible' => array(
+        'input[name="field[settings][pager][enabled]"]' => array('checked' => FALSE),
+      ),
+    ),
   );
-
-  // @todo implement #states to hide pager_display when pager = 0
-  // @todo add validation so that user cannot add pager and set limit 0 at the same time.
 
   return $form;
 }
@@ -253,20 +262,22 @@ function editor_note_field_widget_info() {
  * Creates widget for the field.
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  $element['note'] = array(
-    '#type' => 'textarea',
-    '#title' => $instance['label'],
-    '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
-    '#attributes' => array(
-      'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
-      'placeholder' => t($field['settings']['notes_placeholder']),
-    ),
-  );
+  if ($field['type'] == 'editor_notes') {
+    $element['note'] = array(
+      '#type' => 'textarea',
+      '#title' => $instance['label'],
+      '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
+      '#attributes' => array(
+        'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
+        'placeholder' => t($field['settings']['notes_placeholder']),
+      ),
+    );
 
-  $element['id'] = array(
-    '#type' => 'hidden',
-    '#default_value' => isset($items[$delta]['id']) ? $items[$delta]['id'] : '',
-  );
+    $element['id'] = array(
+      '#type' => 'hidden',
+      '#default_value' => isset($items[$delta]['id']) ? $items[$delta]['id'] : '',
+    );
+  }
 
   return $element;
 }
@@ -275,22 +286,27 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
  * Implements hook_field_validate().
  * Defines messages that will be shown on validation of widget form using hook_field_widget_error().
  */
-// @todo validate so that editor cannot change values in hidden fields manually and then to save field.
+// @todo validate so that hacker cannot change values in hidden fields manually and then to save field of another user.
+// @todo validate if hacker enters manually invalid field id.
 function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
   foreach ($items as $delta => $item) {
-    if (empty($item['note'])) {
-      if ($instance['required']) {
+    if ($entity_type && $entity) {
+      // Field widget form validation, otherwise field settings form.
+      if (empty($item['note']) && $instance['required']) {
         $errors[$field['field_name']][$langcode][$delta][] = array(
           'error' => 'note',
           'message' => t('Field %name is required.', array('%name' => $instance['label'])),
         );
       }
     }
-    elseif (mb_strlen($item['note']) > $field['settings']['notes_maxlength']) {
-      $errors[$field['field_name']][$langcode][$delta][] = array(
-        'error' => 'notes_maxlength',
-        'message' => t('%name: the value cannot not be longer than %max characters.', array('%name' => $instance['label'], '%max' => $field['settings']['notes_maxlength'])),
-      );
+    if (!empty($item['note']) && $field['settings']['notes_maxlength'] > 0) {
+      if (mb_strlen($item['note']) > $field['settings']['notes_maxlength']) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'notes_maxlength',
+          'message' => t('%name: the value cannot not be longer than %max characters.',
+            array('%name' => $instance['label'], '%max' => $field['settings']['notes_maxlength'])),
+        );
+      }
     }
     // Validate first element since there can be only 1 textarea for adding notes (even for multiple value field).
     break;
@@ -385,12 +401,13 @@ function editor_note_theme_field_multiple_value_form($variables) {
   $element = $variables['element'];
   $field_info = field_info_field($variables['element']['#field_name']);
   if ($field_info['type'] == 'editor_note') {
-    // Custom function for 'notes' field widget form, field of other types have default functionality.
-    // 'Notes' cardinality is always > 1 because 'notes' field makes sense only when at least 2 editors work on material.
+    // Custom function for 'notes' field widget form.
+    // 'Notes' cardinality is always > 1 because 'editor notes' field makes sense
+    // when at least 2 editors work on same material.
     $output = editor_note_theme_widget_form($variables, $element);
   }
   else {
-    // Otherwise use default theme function.
+    // Otherwise uses default theme function.
     $output = theme_field_multiple_value_form($variables);
   }
   return $output;
@@ -405,26 +422,21 @@ function editor_note_theme_field_multiple_value_form($variables) {
  * @return string
  */
 function editor_note_theme_widget_form($variables, $element) {
-  $field_info = field_info_field($element['#field_name']);
-
+  $output = array();
   $add_note_field = $element[0];
+  $field = field_info_field($element['#field_name']);
+
   if (isset($add_note_field['_weight'])) {
-    // Hide $items['_weight'] from display.
+    // Hides $items['_weight'] from display.
     $add_note_field['_weight']['#attributes']['class'][] = 'element-invisible';
   }
   $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
   if ($required) {
-    // Add required mark to the title of 'Add Note' field.
+    // Adds required mark to the title of 'Add Note' field.
     $add_note_field['note']['#title'] .= $required;
   }
-  $notes = editor_note_get_notes(
-    $element[0]['#entity_type'],
-    $element[0]['#entity'],
-    $field_info['settings']['limit'],
-    $field_info['settings']['pager'],
-    $field_info['settings']['order']
-  );
-  $formatted_notes = editor_note_get_formatted_notes($variables, $field_info, $notes);
+  $notes = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity'], $field);
+  $formatted_notes = editor_note_get_formatted_notes($variables, $field, $notes);
   // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
   // @todo if cardinality setting present ensure that button doesn't show up.
   $add_note_button = array(
@@ -433,9 +445,7 @@ function editor_note_theme_widget_form($variables, $element) {
     '#value' => t('Add Note'),
   );
 
-  $output = array();
-
-  if ($field_info['settings']['display'] == 0) {
+  if ($field['settings']['display'] == 0) {
     $output[] = $formatted_notes;
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
@@ -532,21 +542,22 @@ function editor_note_delete_multiple($note_ids) {
  *
  * @param $entity_type
  * @param $entity
+ * @param $field
+ * @param $instance
  *
- * @return array
+ * @return mixed
  */
-function editor_note_get_notes($entity_type, $entity, $limit = 10, $pager = TRUE, $order = 'DESC') {
+function editor_note_get_notes($entity_type, $entity, $field) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
-
   $query = db_select('editor_note', 'en');
 
-  if ($limit > 0) {
-    if ($pager) {
+  if ($field['settings']['limit'] > 0) {
+    if ($field['settings']['pager']['enabled']) {
       $query = $query->extend('PagerDefault');
-      $query->limit($limit);
+      $query->limit($field['settings']['limit']);
     }
     else {
-      $query->range(0, $limit);
+      $query->range(0, $field['settings']['limit']);
     }
   }
 
@@ -555,7 +566,7 @@ function editor_note_get_notes($entity_type, $entity, $limit = 10, $pager = TRUE
     ->condition('en.entity_id', $entity_id, '=')
     ->condition('en.bundle', $bundle, '=')
     ->condition('en.revision_id', $revision_id, '=')
-    ->orderBy('en.created', $order);
+    ->orderBy('en.created', $field['settings']['order']);
 
   $notes = $query->execute()->fetchAllAssoc('id');
 
@@ -570,91 +581,98 @@ function editor_note_get_notes($entity_type, $entity, $limit = 10, $pager = TRUE
  * @return string
  */
 function editor_note_get_formatted_notes($variables, $field_info, $notes) {
-  global $user;
+  $formatted_notes = '';
 
-  $element = $variables['element'];
-  $table_id = drupal_html_id($element['#field_name'] . '_values');
+  if (!empty($notes)) {
+    global $user;
+    $element = $variables['element'];
 
-  $header = array(
-    array(
-      'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
-      'class' => array('field-label'),
-    ),
-    array(
-      'data' => t('Author'),
-      'class' => array('field-author'),
-    ),
-    array(
-      'data' => t('Created'),
-      'class' => array('field-created'),
-    ),
-    array(
-      'data' => t('Changed'),
-      'class' => array('field-changed'),
-    ),
-    array(
-      'data' => t('Operations'),
-      'class' => array('field-operations'),
-    ),
-  );
-
-  $rows = array();
-  $counter = 0;
-
-  // @todo check if element can be required and validation should stop from saving empty field.
-  // @todo check if user may access user profiles
-
-  foreach ($notes as $note_id => $item) {
-    $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
+    $header = array(
       array(
-        'items' => array(
-          l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
-          l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
+        'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
+        'class' => array('field-label'),
+      ),
+      array(
+        'data' => t('Author'),
+        'class' => array('field-author'),
+      ),
+      array(
+        'data' => t('Created'),
+        'class' => array('field-created'),
+      ),
+      array(
+        'data' => t('Changed'),
+        'class' => array('field-changed'),
+      ),
+      array(
+        'data' => t('Operations'),
+        'class' => array('field-operations'),
+      ),
+    );
+
+    $rows = array();
+    $counter = 0;
+
+    // @todo check if user may access user profiles
+    // @todo implement ajax controls in operations to edit or remove notes
+
+    foreach ($notes as $note_id => $item) {
+      $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
+        array(
+          'items' => array(
+            l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
+            l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
+          )
+        )
+      );
+      $rows[$counter] = array(
+        'data' => array(
+          'note' => array(
+            'data' => $item->note,
+            'class' => array('note'),
+          ),
+          'author' => array(
+            'data' => l(format_username(user_load($item->uid)), 'user/' . $item->uid),
+            'class' => array('author'),
+          ),
+          'changed' => array(
+            'data' => format_date($item->changed, 'short'),
+            'class' => array('changed'),
+          ),
+          'created' => array(
+            'data' => format_date($item->created, 'short'),
+            'class' => array('created'),
+          ),
+          'operations' => array(
+            'data' => $operations,
+            'class' => array('operations'),
+          ),
+        ),
+        'class' => array('note-' . $note_id),
+      );
+      $counter++;
+    }
+
+    $notes_table = theme(
+      'table',
+      array(
+        'header' => $header,
+        'rows' => $rows,
+        'attributes' => array(
+          'id' => drupal_html_id($element['#field_name'] . '_values'),
+          'class' => array('field-notes-table')
         )
       )
     );
-    $rows[$counter] = array(
-      'data' => array(
-        'note' => array(
-          'data' => $item->note,
-          'class' => array('note'),
-        ),
-        'author' => array(
-          'data' => l(format_username(user_load($item->uid)), 'user/' . $item->uid),
-          'class' => array('author'),
-        ),
-        'changed' => array(
-          'data' => format_date($item->changed, 'short'),
-          'class' => array('changed'),
-        ),
-        'created' => array(
-          'data' => format_date($item->created, 'short'),
-          'class' => array('created'),
-        ),
-        'operations' => array(
-          'data' => $operations,
-          'class' => array('operations'),
-        ),
-      ),
-      'class' => array('note-' . $note_id),
-    );
-    $counter++;
+
+    if ($field_info['settings']['pager']['enabled']) {
+      $formatted_notes = $field_info['settings']['pager']['pager_below'] ?
+        ($notes_table . theme('pager')) : (theme('pager') . $notes_table);
+    }
+    else {
+      $formatted_notes = $notes_table;
+    }
   }
-
-  $notes_table = theme(
-    'table',
-    array(
-      'header' => $header,
-      'rows' => $rows,
-      'attributes' => array(
-        'id' => $table_id,
-        'class' => array('field-notes-table')
-      )
-    )
-  );
-
-  $formatted_notes = $field_info['settings']['pager_below'] == 1 ?
-    ($notes_table . theme('pager')) : (theme('pager') . $notes_table);
 
   return $formatted_notes;
 }
