@@ -104,7 +104,7 @@ function editor_note_field_info() {
       'settings' => array(
         'notes_size' => 3,
         'notes_placeholder' => 'Create a note',
-        'notes_maxlength' => 0, // @todo test if it works in IE and perform server-side validation
+        'notes_maxlength' => 0,
         'limit' => 10,
         'order' => 'DESC',
         'display' => 1,
@@ -120,17 +120,15 @@ function editor_note_field_info() {
 
 /**
  * Implements hook_field_is_empty().
+ * Defines whether to save field value to the database.
  */
 function editor_note_field_is_empty($item, $field) {
-  // @todo update hook with actual values.
-  if (empty($item['note']) && $item['note'] !== '0') {
-    return TRUE;
-  }
-  return FALSE;
+  return empty($item['note']) ? TRUE : FALSE;
 }
 
 /**
  * Implements hook_field_settings_form().
+ * Creates field settings form.
  */
 function editor_note_field_settings_form($field, $instance, $has_data) {
   $settings = $field['settings'];
@@ -219,6 +217,7 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
 
 /**
  * Implements hook_form_FORM_ID_alter().
+ * Alters cardinality field of field settings form.
  */
 function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
@@ -232,25 +231,8 @@ function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
 }
 
 /**
- * Implements hook_field_validate().
- */
-// @todo validate so that editor cannot change values in hidden fields manually and then to save field.
-// @todo check field on preview and validation.
-function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
-//  foreach ($items as $delta => $item) {
-//    if (!empty($item['value'])) {
-//      if (!empty($field['settings']['max_length']) && drupal_strlen($item['value']) > $field['settings']['max_length']) {
-//        $errors[$field['field_name']][$langcode][$delta][] = array(
-//          'error' => 'text_max_length',
-//          'message' => t('%name: the value may not be longer than %max characters.', array('%name' => $instance['label'], '%max' => $field['settings']['max_length'])),
-//        );
-//      }
-//    }
-//  }
-}
-
-/**
  * Implements hook_field_widget_info().
+ * Registers widget for the field.
  */
 function editor_note_field_widget_info() {
   return array(
@@ -268,6 +250,7 @@ function editor_note_field_widget_info() {
 
 /**
  * Implements hook_field_widget_form().
+ * Creates widget for the field.
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   $element['note'] = array(
@@ -289,10 +272,37 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
 }
 
 /**
+ * Implements hook_field_validate().
+ * Defines messages that will be shown on validation of widget form using hook_field_widget_error().
+ */
+// @todo validate so that editor cannot change values in hidden fields manually and then to save field.
+function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  foreach ($items as $delta => $item) {
+    if (empty($item['note'])) {
+      if ($instance['required']) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'note',
+          'message' => t('Field %name is required.', array('%name' => $instance['label'])),
+        );
+      }
+    }
+    elseif (mb_strlen($item['note']) > $field['settings']['notes_maxlength']) {
+      $errors[$field['field_name']][$langcode][$delta][] = array(
+        'error' => 'notes_maxlength',
+        'message' => t('%name: the value cannot not be longer than %max characters.', array('%name' => $instance['label'], '%max' => $field['settings']['notes_maxlength'])),
+      );
+    }
+    // Validate first element since there can be only 1 textarea for adding notes (even for multiple value field).
+    break;
+  }
+}
+
+/**
  * Implements hook_field_widget_error().
+ * Displays validation errors if present and prevents form submit.
  */
 function editor_note_field_widget_error($element, $error, $form, &$form_state) {
-//  form_error($element, $error['message']);
+  form_error($element, $error['message']);
 }
 
 /**
@@ -321,6 +331,7 @@ function editor_note_field_update($entity_type, $entity, $field, $instance, $lan
 
 /**
  * Implements hook_field_formatter_info().
+ * Registers formatter for the field.
  */
 function editor_note_field_formatter_info() {
   return array(
@@ -333,6 +344,7 @@ function editor_note_field_formatter_info() {
 
 /**
  * Implements hook_field_formatter_view().
+ * Defines formatter for the field.
  */
 function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
@@ -351,6 +363,7 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
 
 /**
  * Implements hook_theme_registry_alter().
+ * Replaces default 'field_multiple_value_form' theme function with a custom function.
  */
 function editor_note_theme_registry_alter(&$theme_registry) {
   if (isset($theme_registry['field_multiple_value_form'])) {
