@@ -57,6 +57,18 @@ function editor_note_entity_property_info() {
       'description' => 'The entity type editor note is attached to.',
       'schema field' => 'entity_type',
     ),
+    'bundle' => array(
+      'type' => 'text',
+      'label' => t('Bundle'),
+      'description' => 'The bundle of the entity editor note is attached to.',
+      'schema field' => 'bundle',
+    ),
+    'field_name' => array(
+      'type' => 'text',
+      'label' => t('Field Name'),
+      'description' => 'The field name of the field containing editor note.',
+      'schema field' => 'field_name',
+    ),
     'entity_id' => array(
       'type' => 'int',
       'label' => t('Entity ID'),
@@ -263,10 +275,12 @@ function editor_note_field_widget_info() {
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   if ($field['type'] == 'editor_note') {
+    // @todo ensure that all label and description are translatable.
     $element['note'] = array(
       '#type' => 'textarea',
       '#title' => $instance['label'],
       '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
+      '#description' => $instance['description'],
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
         'placeholder' => t($field['settings']['notes_placeholder']),
@@ -340,7 +354,7 @@ function editor_note_field_insert($entity_type, $entity, $field, $instance, $lan
 function editor_note_field_update($entity_type, $entity, $field, $instance, $langcode, &$items) {
   if ($field['type'] == 'editor_note') {
     foreach ($items as $item) {
-      editor_note_save($item['note'], $entity_type, $entity);
+      editor_note_save($item['note'], $entity_type, $entity, $field['field_name']);
     }
   }
 }
@@ -384,9 +398,7 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
 
   if ($display['type'] == 'editor_note_field_formatter') {
     foreach ($items as $delta => $item) {
-      $element[$delta] = array(
-        '#markup' => $item['note'],
-      );
+
     }
   }
 
@@ -486,11 +498,12 @@ function editor_note_theme_widget_form($variables, $element) {
  * @param $note
  * @param $entity_type
  * @param $entity
+ * @param $field_name
  * @param null $uid
  * @param null $created
  * @param null $changed
  */
-function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = NULL, $changed = NULL) {
+function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL, $created = NULL, $changed = NULL) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
   if (!isset($revision_id)) {
     $revision_id = $entity_id;
@@ -504,6 +517,7 @@ function editor_note_save($note, $entity_type, $entity, $uid = NULL, $created = 
       'note' => $note,
       'bundle' => $bundle,
       'entity_type' => $entity_type,
+      'field_name' => $field_name,
       'entity_id' => $entity_id,
       'revision_id' => $revision_id,
       'uid' => (int) $uid,
@@ -582,7 +596,20 @@ function editor_note_get_notes($entity_type, $entity, $field) {
     }
   }
 
-  $query->fields('en', array('id', 'note', 'entity_type', 'bundle', 'entity_id', 'revision_id', 'uid', 'created', 'changed'))
+  $columns = array(
+    'id',
+    'note',
+    'entity_type',
+    'bundle',
+    'field_name',
+    'entity_id',
+    'revision_id',
+    'uid',
+    'created',
+    'changed',
+  );
+
+  $query->fields('en', $columns)
     ->condition('en.entity_type', $entity_type, '=')
     ->condition('en.entity_id', $entity_id, '=')
     ->condition('en.bundle', $bundle, '=')

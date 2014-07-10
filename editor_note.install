@@ -35,6 +35,13 @@ function editor_note_schema() {
         'default' => '',
         'description' => 'The bundle of the entity note is attached to.',
       ),
+      'field_name' => array(
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+        'description' => 'The {field_config}.field name of the field containing editor note.',
+      ),
       'entity_id' => array(
         'type' => 'int',
         'unsigned' => TRUE,
