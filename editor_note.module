@@ -276,7 +276,7 @@ function editor_note_field_widget_info() {
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   if ($field['type'] == 'editor_note') {
-    // @todo ensure that all label and description are translatable.
+    // @todo ensure that all labels and descriptions are translatable.
     $element['note'] = array(
       '#type' => 'textarea',
       '#title' => $instance['label'],
@@ -478,14 +478,9 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
  */
 function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
-
   if ($display['type'] == 'editor_note_field_formatter') {
     $notes = editor_note_get_notes($entity_type, $entity, $display);
-    $element[0]['editor_notes'] = array(
-      '#value' => editor_note_get_formatted_notes($display, $notes),
-      '#type' => 'html_tag', // @todo refactor this as renderable array is ready.
-      '#tag' => 'div',
-    );
+    $element[0][$field['field_name']] = editor_note_get_formatted_notes($display, $notes);
   }
 
   return $element;
@@ -567,10 +562,10 @@ function editor_note_theme_widget_form($variables, $element) {
   if ($field['settings']['display']) {
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
-    $output[] = $formatted_notes;
+    $output[] = drupal_render($formatted_notes);
   }
   else {
-    $output[] = $formatted_notes;
+    $output[] = drupal_render($formatted_notes);
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
   }
@@ -714,10 +709,10 @@ function editor_note_get_notes($entity_type, $entity, $field) {
  * @param $notes
  * @param $widget
  *
- * @return string
+ * @return array
  */
 function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
-  $formatted_notes = '';
+  $formatted_notes = array();
 
   if (!empty($notes)) {
     global $user;
@@ -794,27 +789,35 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       $counter++;
     }
 
-    $notes_table = theme(
-      'table',
-      array(
-        'header' => $header,
-        'rows' => $rows,
-        'attributes' => array(
-          'class' => array('field-notes-table')
-        )
+    $notes_table = array(
+      '#theme' => 'table',
+      '#header' => $header,
+      '#rows' => $rows,
+      'attributes' => array(
+        'class' => array('field-notes-table')
       )
     );
 
     if ($field['settings']['pager']['enabled']) {
-      $formatted_notes = $field['settings']['pager']['pager_below'] ?
-        ($notes_table . theme('pager')) : (theme('pager') . $notes_table);
+      if ($field['settings']['pager']['pager_below']) {
+        $formatted_notes = array(
+          'notes_table' => $notes_table,
+          'notes_table_pager' => array('#theme' => 'pager'),
+        );
+      }
+      else {
+        $formatted_notes = array(
+          'notes_table_pager' => array('#theme' => 'pager'),
+          'notes_table' => $notes_table,
+        );
+      }
     }
     else {
-      $formatted_notes = $notes_table;
+      $formatted_notes = array(
+        'notes_table' => $notes_table,
+      );
     }
   }
-
-  // @todo output table as a renderable array and test in widget and formatter.
 
   return $formatted_notes;
 }
