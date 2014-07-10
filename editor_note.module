@@ -6,13 +6,13 @@
  */
 
 /**
- * @todo textarea (delta 0) and table (delta >= 1)
  * @todo check on /node/add/ - should not be possible to add notes via ajax on empty node
- * @todo think about field permissions
+ * @todo check field permissions
  * @todo test with multiple languages
  * @todo test with revisions
- * @todo field throws error on its deletion
+ * @todo field throws error on its deletion, install from scratch and double check
  * @todo add README.txt and hook_help
+ * @todo add wysiwyg/filtered text support in the future
  */
 
 /**
@@ -248,7 +248,7 @@ function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
       drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
     $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
       $form['field']['cardinality']['#default_value'] : -1;
-    $form['field']['cardinality']['#description'] = t('Maximum number of values users can enter for this field.');
+    $form['field']['cardinality']['#description'] = t('Maximum number of values that field can store.');
   }
 }
 
@@ -412,13 +412,6 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
       '#description' => t('Set order of notes in the table.'),
     );
 
-    $element['display'] = array(
-      '#type' => 'checkbox',
-      '#title' => t('Textarea above notes table'),
-      '#default_value' => $settings['display'],
-      '#description' => t('Display "Create a note" field above the notes table. Otherwise it will be shown below the notes table.'),
-    );
-
     $element['pager'] = array(
       '#type' => 'fieldset',
       '#title' => t('Pagination'),
@@ -470,7 +463,6 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
   if ($display['type'] == 'editor_note_field_formatter') {
     $summary[] = t('Display a specified number of items') . ': ' . $display['settings']['limit'];
     $summary[] = t('Notes Ordering') . ': ' . ($settings['order'] == 'DESC' ? t('display new notes first') : t('display old notes first'));
-    $summary[] = t('Textarea above notes table') . ': ' . ($settings['display'] ? 'true' : 'false');
     if ($display['settings']['limit'] > 0) {
       $summary[] = t('Enable pagination') . ': ' . ($settings['pager']['enabled'] ? 'true' : 'false');
       $summary[] = t('Pagination below notes table') . ': ' . ($settings['pager']['pager_below'] ? 'true' : 'false');
@@ -482,16 +474,18 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
 
 /**
  * Implements hook_field_formatter_view().
- * Builds registered formatters for the field.
+ * Builds registered formatters for the field, returns renderable array.
  */
 function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
-  $settings = $display['settings'];
 
   if ($display['type'] == 'editor_note_field_formatter') {
-    foreach ($items as $delta => $item) {
-
-    }
+    $notes = editor_note_get_notes($entity_type, $entity, $display);
+    $element[0]['editor_notes'] = array(
+      '#value' => editor_note_get_formatted_notes($display, $notes),
+      '#type' => 'html_tag', // @todo refactor this as renderable array is ready.
+      '#tag' => 'div',
+    );
   }
 
   return $element;
@@ -548,9 +542,9 @@ function editor_note_theme_widget_form($variables, $element) {
 
   $field = field_info_field($element['#field_name']);
   $notes = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity'], $field);
-  $formatted_notes = editor_note_get_formatted_notes($variables, $field, $notes);
+  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
 
-  // Cardinality = -1 for unlimited values.
+  // Cardinality by default -1 for unlimited values.
   if ($field['cardinality'] < 0 || count($notes) < $field['cardinality']) {
     $add_note_field = $element[0];
     $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
@@ -716,22 +710,23 @@ function editor_note_get_notes($entity_type, $entity, $field) {
 /**
  * Returns formatted notes table.
  *
+ * @param $field
  * @param $notes
+ * @param $widget
  *
  * @return string
  */
-function editor_note_get_formatted_notes($variables, $field_info, $notes) {
+function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
   $formatted_notes = '';
 
   if (!empty($notes)) {
     global $user;
-    $element = $variables['element'];
     $rows = array();
     $counter = 0;
 
     $header = array(
       array(
-        'data' => '<label>' . t('!title', array('!title' => $element['#title'])) . '</label>',
+        'data' => t('Notes'),
         'class' => array('field-label'),
       ),
       array(
@@ -746,22 +741,16 @@ function editor_note_get_formatted_notes($variables, $field_info, $notes) {
         'data' => t('Changed'),
         'class' => array('field-changed'),
       ),
-      array(
-        'data' => t('Operations'),
-        'class' => array('field-operations'),
-      ),
     );
 
-    foreach ($notes as $note_id => $item) {
-      // @todo implement ajax controls in operations to edit or remove notes
-      $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
-        array(
-          'items' => array(
-            l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
-            l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
-          )
-        )
+    if ($widget) {
+      $header[] = array(
+        'data' => t('Operations'),
+        'class' => array('field-operations'),
       );
+    }
+
+    foreach ($notes as $note_id => $item) {
       $rows[$counter] = array(
         'data' => array(
           'note' => array(
@@ -782,13 +771,26 @@ function editor_note_get_formatted_notes($variables, $field_info, $notes) {
             'data' => format_date($item->created, 'short'),
             'class' => array('created'),
           ),
-          'operations' => array(
-            'data' => $operations,
-            'class' => array('operations'),
-          ),
         ),
         'class' => array('note-' . $note_id),
       );
+
+      if ($widget) {
+        // @todo implement ajax controls in operations to edit or remove notes
+        $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
+          array(
+            'items' => array(
+              l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
+              l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
+            )
+          )
+        );
+        $rows[$counter]['data']['operations'] = array(
+          'data' => $operations,
+          'class' => array('operations'),
+        );
+      }
+
       $counter++;
     }
 
@@ -798,20 +800,21 @@ function editor_note_get_formatted_notes($variables, $field_info, $notes) {
         'header' => $header,
         'rows' => $rows,
         'attributes' => array(
-          'id' => drupal_html_id($element['#field_name'] . '_values'),
           'class' => array('field-notes-table')
         )
       )
     );
 
-    if ($field_info['settings']['pager']['enabled']) {
-      $formatted_notes = $field_info['settings']['pager']['pager_below'] ?
+    if ($field['settings']['pager']['enabled']) {
+      $formatted_notes = $field['settings']['pager']['pager_below'] ?
         ($notes_table . theme('pager')) : (theme('pager') . $notes_table);
     }
     else {
       $formatted_notes = $notes_table;
     }
   }
+
+  // @todo output table as a renderable array and test in widget and formatter.
 
   return $formatted_notes;
 }
