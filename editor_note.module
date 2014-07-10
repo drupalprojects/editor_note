@@ -259,10 +259,10 @@ function editor_note_field_widget_info() {
 
 /**
  * Implements hook_field_widget_form().
- * Creates widget for the field.
+ * Creates widget for the field, called for each field item.
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
-  if ($field['type'] == 'editor_notes') {
+  if ($field['type'] == 'editor_note') {
     $element['note'] = array(
       '#type' => 'textarea',
       '#title' => $instance['label'],
@@ -423,37 +423,43 @@ function editor_note_theme_field_multiple_value_form($variables) {
  */
 function editor_note_theme_widget_form($variables, $element) {
   $output = array();
-  $add_note_field = $element[0];
+  $add_note_field = array();
+  $add_note_button = array();
   $field = field_info_field($element['#field_name']);
 
   if (isset($add_note_field['_weight'])) {
     // Hides $items['_weight'] from display.
     $add_note_field['_weight']['#attributes']['class'][] = 'element-invisible';
   }
-  $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
-  if ($required) {
-    // Adds required mark to the title of 'Add Note' field.
-    $add_note_field['note']['#title'] .= $required;
-  }
+  
   $notes = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity'], $field);
   $formatted_notes = editor_note_get_formatted_notes($variables, $field, $notes);
-  // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
-  // @todo if cardinality setting present ensure that button doesn't show up.
-  $add_note_button = array(
-    '#type' => 'submit',
-    '#name' => $element['#field_name'] . '_save_note',
-    '#value' => t('Add Note'),
-  );
 
-  if ($field['settings']['display'] == 0) {
-    $output[] = $formatted_notes;
+  if (count($notes) < $field['cardinality']) {
+    $add_note_field = $element[0];
+    $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
+    if ($required) {
+      // Adds required mark to the title of 'Add Note' field.
+      $add_note_field['note']['#title'] .= $required;
+    }
+    $add_note_button = array(
+      '#type' => 'submit',
+      '#name' => $element['#field_name'] . '_save_note',
+      '#value' => t('Add Note'),
+    );
+  }
+
+  // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
+
+  if ($field['settings']['display']) {
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
+    $output[] = $formatted_notes;
   }
   else {
+    $output[] = $formatted_notes;
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
-    $output[] = $formatted_notes;
   }
 
   return '<div class="form-item">' . implode('', $output) . '</div>';
