@@ -359,8 +359,24 @@ function editor_note_field_formatter_info() {
 }
 
 /**
+ * Implements hook_field_formatter_settings_form().
+ * Creates field formatter forms for registered types of formatters.
+ */
+function editor_note_field_formatter_settings_form($field, $instance, $view_mode, $form, &$form_state) {
+  $display = $instance['display'][$view_mode];
+  $settings = $display['settings'];
+  $element = array();
+
+  if ($display['type'] == 'editor_note_field_formatter') {
+    // @todo add field_formatter_settings_form.
+  }
+
+  return $element;
+}
+
+/**
  * Implements hook_field_formatter_view().
- * Defines formatter for the field.
+ * Builds registered formatters for the field.
  */
 function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
@@ -425,31 +441,30 @@ function editor_note_theme_widget_form($variables, $element) {
   $output = array();
   $add_note_field = array();
   $add_note_button = array();
-  $field = field_info_field($element['#field_name']);
 
-  if (isset($add_note_field['_weight'])) {
-    // Hides $items['_weight'] from display.
-    $add_note_field['_weight']['#attributes']['class'][] = 'element-invisible';
-  }
-  
+  $field = field_info_field($element['#field_name']);
   $notes = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity'], $field);
   $formatted_notes = editor_note_get_formatted_notes($variables, $field, $notes);
 
-  if (count($notes) < $field['cardinality']) {
+  // Cardinality = -1 for unlimited values.
+  if ($field['cardinality'] < 0 || count($notes) < $field['cardinality']) {
     $add_note_field = $element[0];
     $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
     if ($required) {
       // Adds required mark to the title of 'Add Note' field.
       $add_note_field['note']['#title'] .= $required;
     }
+    if (isset($add_note_field['_weight'])) {
+      // Hides $items['_weight'] from display.
+      $add_note_field['_weight']['#attributes']['class'][] = 'element-invisible';
+    }
+    // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
     $add_note_button = array(
       '#type' => 'submit',
       '#name' => $element['#field_name'] . '_save_note',
       '#value' => t('Add Note'),
     );
   }
-
-  // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
 
   if ($field['settings']['display']) {
     $output[] = drupal_render($add_note_field);
@@ -592,6 +607,8 @@ function editor_note_get_formatted_notes($variables, $field_info, $notes) {
   if (!empty($notes)) {
     global $user;
     $element = $variables['element'];
+    $rows = array();
+    $counter = 0;
 
     $header = array(
       array(
@@ -616,13 +633,8 @@ function editor_note_get_formatted_notes($variables, $field_info, $notes) {
       ),
     );
 
-    $rows = array();
-    $counter = 0;
-
-    // @todo check if user may access user profiles
-    // @todo implement ajax controls in operations to edit or remove notes
-
     foreach ($notes as $note_id => $item) {
+      // @todo implement ajax controls in operations to edit or remove notes
       $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
         array(
           'items' => array(
@@ -638,7 +650,9 @@ function editor_note_get_formatted_notes($variables, $field_info, $notes) {
             'class' => array('note'),
           ),
           'author' => array(
-            'data' => l(format_username(user_load($item->uid)), 'user/' . $item->uid),
+            'data' => user_access('access user profiles') ?
+                l(format_username(user_load($item->uid)), 'user/' . $item->uid) :
+                format_username(user_load($item->uid)),
             'class' => array('author'),
           ),
           'changed' => array(
