@@ -7,13 +7,23 @@
 
 /**
  * @todo check on /node/add/ - should not be possible to add notes via ajax on empty node
- * @todo check field permissions
+ * @todo check field permissions - https://www.drupal.org/project/field_permissions
  * @todo test with multiple languages
  * @todo test with revisions
  * @todo field throws error on its deletion, install from scratch and double check
- * @todo add README.txt and hook_help
+ * @todo add detailed README.txt and hook_help
  * @todo add wysiwyg/filtered text support in the future
  */
+
+/**
+ * Implements hook_help().
+ */
+function editor_note_help($path, $arg) {
+  if ($path == 'admin/help#editor_note') {
+    // Return a line-break version of the module README.txt.
+    return _filter_autop(file_get_contents(dirname(__FILE__) . '/README.txt'));
+  }
+}
 
 /**
  * Implements hook_entity_info().
@@ -139,7 +149,7 @@ function editor_note_field_info() {
  * Defines whether to save field value to the database.
  */
 function editor_note_field_is_empty($item, $field) {
-  return empty($item['note']) ? TRUE : FALSE;
+  return empty($item['note']);
 }
 
 /**
@@ -279,9 +289,9 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
     // @todo ensure that all labels and descriptions are translatable.
     $element['note'] = array(
       '#type' => 'textarea',
-      '#title' => $instance['label'],
+      '#title' => check_plain($instance['label']),
       '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
-      '#description' => $instance['description'],
+      '#description' => check_plain($instance['description']),
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
         'placeholder' => t($field['settings']['notes_placeholder']),
@@ -478,6 +488,7 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
  */
 function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
+  $display['field_name'] = $field['field_name'];
   if ($display['type'] == 'editor_note_field_formatter') {
     $notes = editor_note_get_notes($entity_type, $entity, $display);
     $element[0][$field['field_name']] = editor_note_get_formatted_notes($display, $notes);
@@ -695,6 +706,7 @@ function editor_note_get_notes($entity_type, $entity, $field) {
     ->condition('en.entity_id', $entity_id, '=')
     ->condition('en.bundle', $bundle, '=')
     ->condition('en.revision_id', $revision_id, '=')
+    ->condition('en.field_name', $field['field_name'], '=')
     ->orderBy('en.created', $field['settings']['order']);
 
   $notes = $query->execute()->fetchAllAssoc('id');
@@ -798,7 +810,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       )
     );
 
-    if ($field['settings']['pager']['enabled']) {
+    if ($field['settings']['pager']['enabled'] && count($notes) == $field['settings']['limit']) {
       if ($field['settings']['pager']['pager_below']) {
         $formatted_notes = array(
           'notes_table' => $notes_table,
