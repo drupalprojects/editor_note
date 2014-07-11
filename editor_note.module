@@ -149,7 +149,9 @@ function editor_note_field_info() {
  * Defines whether to save field value to the database.
  */
 function editor_note_field_is_empty($item, $field) {
-  return empty($item['note']);
+  if ($field['type'] == 'editor_note') {
+    return empty($item['note']);
+  }
 }
 
 /**
@@ -314,27 +316,29 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
 // @todo validate so that hacker cannot change values in hidden fields manually and then to save field of another user.
 // @todo validate if hacker enters manually invalid field id.
 function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
-  foreach ($items as $delta => $item) {
-    if ($entity_type && $entity) {
-      // Field widget form validation, otherwise field settings form.
-      if (empty($item['note']) && $instance['required']) {
-        $errors[$field['field_name']][$langcode][$delta][] = array(
-          'error' => 'note',
-          'message' => t('Field %name is required.', array('%name' => $instance['label'])),
-        );
+  if ($field['type'] == 'editor_note') {
+    foreach ($items as $delta => $item) {
+      if ($entity_type && $entity) {
+        // Field widget form validation, otherwise field settings form.
+        if (empty($item['note']) && $instance['required']) {
+          $errors[$field['field_name']][$langcode][$delta][] = array(
+            'error' => 'note',
+            'message' => t('Field %name is required.', array('%name' => $instance['label'])),
+          );
+        }
       }
-    }
-    if (!empty($item['note']) && $field['settings']['notes_maxlength'] > 0) {
-      if (mb_strlen($item['note']) > $field['settings']['notes_maxlength']) {
-        $errors[$field['field_name']][$langcode][$delta][] = array(
-          'error' => 'notes_maxlength',
-          'message' => t('%name: the value cannot not be longer than %max characters.',
-            array('%name' => $instance['label'], '%max' => $field['settings']['notes_maxlength'])),
-        );
+      if (!empty($item['note']) && $field['settings']['notes_maxlength'] > 0) {
+        if (mb_strlen($item['note']) > $field['settings']['notes_maxlength']) {
+          $errors[$field['field_name']][$langcode][$delta][] = array(
+            'error' => 'notes_maxlength',
+            'message' => t('%name: the value cannot not be longer than %max characters.',
+              array('%name' => $instance['label'], '%max' => $field['settings']['notes_maxlength'])),
+          );
+        }
       }
+      // Validate first element since there can be only 1 textarea for adding notes (even for multiple value field).
+      break;
     }
-    // Validate first element since there can be only 1 textarea for adding notes (even for multiple value field).
-    break;
   }
 }
 
