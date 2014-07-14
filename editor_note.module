@@ -847,7 +847,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       '#theme' => 'table',
       '#header' => $header,
       '#rows' => $rows,
-      'attributes' => array(
+      '#attributes' => array(
         'class' => array('field-notes-table')
       )
     );
@@ -891,6 +891,7 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 
 function editor_note_confirm_remove_form($form, $form_state, $id) {
   $form = array();
+  $note = editor_note_load(arg(3)); // @todo check if note has been loaded
 
   $form['note'] = array(
     '#markup' => '<p>' . t('Are you sure you want to remove the note? This action cannot be undone.') . '</p>',
@@ -898,7 +899,22 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
 
   $form['note_id'] = array(
     '#type' => 'value',
-    '#value' => arg(3),
+    '#value' => $note->id,
+  );
+
+  $form['note_entity_type'] = array(
+    '#type' => 'value',
+    '#value' => $note->entity_type,
+  );
+
+  $form['note_entity_id'] = array(
+    '#type' => 'value',
+    '#value' => $note->entity_id,
+  );
+
+  $form['note_field_name'] = array(
+    '#type' => 'value',
+    '#value' => $note->field_name,
   );
 
   $form['actions'] = array(
@@ -946,6 +962,14 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   // @todo make selector unique because it can be 2 fields added, use field name as a part of class.
   $remove_message = '<div class="editor_note_status_message"><div class="messages status">' . t('Note has been removed.') . '</div></div>';
   $form_state['ajax_commands'][] = ajax_command_replace('.editor_note_status_message', $remove_message);
+
+  $field = field_info_field($form_state['values']['note_field_name']);
+  $entity_array = entity_load($form_state['values']['entity_type'], array($form_state['values']['entity_id']));
+  // @todo check if node has been loaded, test code below.
+  $entity = $entity_array[$form_state['values']['entity_id']];
+  $notes = editor_note_get_notes($form_state['values']['entity_type'], $entity, $field);
+  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+  $form_state['ajax_commands'][] = ajax_command_replace('.field-notes-table', drupal_render($formatted_notes));
 }
 
 /**
