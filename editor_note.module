@@ -10,7 +10,6 @@
  * @todo check field permissions - https://www.drupal.org/project/field_permissions
  * @todo test with multiple languages
  * @todo test with revisions
- * @todo field throws error on its deletion, install from scratch and double check
  * @todo add detailed README.txt and hook_help
  * @todo add wysiwyg/filtered text support in the future
  */
@@ -23,6 +22,21 @@ function editor_note_help($path, $arg) {
     // Return a line-break version of the module README.txt.
     return _filter_autop(file_get_contents(dirname(__FILE__) . '/README.txt'));
   }
+}
+
+/**
+ *  Implements hook_menu().
+ */
+function editor_note_menu() {
+  $items['editor_note/remove/%ctools_js/%'] = array(
+    'title' => 'Remove Note',
+    'page arguments' => array(2, 3),
+    'page callback' => 'editor_note_confirm_remove_page',
+    'access callback' => TRUE, // @todo define access callback, it must be the user authored the note.
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
 }
 
 /**
@@ -574,13 +588,28 @@ function editor_note_theme_widget_form($variables, $element) {
     );
   }
 
+  $status_message_container = array(
+    '#theme' => 'html_tag',
+    '#tag' => 'div',
+    '#attributes' => array(
+      'class' => array('editor_note_status_message'), // @todo make it unique for each field
+    ),
+    '#value' => '',
+  );
+
+  // Load the modal library and add the modal javascript.
+  ctools_include('modal');
+  ctools_modal_add_js();
+
   if ($field['settings']['display']) {
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
+    $output[] = drupal_render($status_message_container);
     $output[] = drupal_render($formatted_notes);
   }
   else {
     $output[] = drupal_render($formatted_notes);
+    $output[] = drupal_render($status_message_container);
     $output[] = drupal_render($add_note_field);
     $output[] = drupal_render($add_note_button);
   }
@@ -634,7 +663,12 @@ function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL
  * @return mixed
  */
 function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
-  return entity_load('editor_note', array($note_id), $conditions, $reset);
+  $note_array = entity_load('editor_note', array($note_id), $conditions, $reset);
+  if (!empty($note_array)) {
+    return $note_array[$note_id];
+  }
+
+  return FALSE;
 }
 
 /**
@@ -759,6 +793,9 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
         'data' => t('Operations'),
         'class' => array('field-operations'),
       );
+
+      ctools_include('modal');
+      ctools_modal_add_js();
     }
 
     foreach ($notes as $note_id => $item) {
@@ -792,7 +829,8 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
           array(
             'items' => array(
               l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
-              l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
+            //  l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
+              l(t('remove'), 'editor_note/remove/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal')))
             )
           )
         );
@@ -848,5 +886,99 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   $value = $element['#value'];
   if ($value !== '' && (!is_numeric($value) || intval($value) != $value || $value < 0)) {
     form_error($element, t('%name must be a positive integer or 0.', array('%name' => $element['#title'])));
+  }
+}
+
+function editor_note_confirm_remove_form($form, $form_state, $id) {
+  $form = array();
+
+  $form['note'] = array(
+    '#markup' => '<p>' . t('Are you sure you want to remove the note? This action cannot be undone.') . '</p>',
+  );
+
+  $form['note_id'] = array(
+    '#type' => 'value',
+    '#value' => arg(3),
+  );
+
+  $form['actions'] = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('element-inline'),
+    ),
+  );
+
+  $form['actions']['cancel'] = array(
+    '#type' => 'submit',
+    '#value' => t('Cancel'),
+    '#submit' => array('editor_note_confirm_remove_form_cancel'),
+  );
+
+  $form['actions']['delete'] = array(
+    '#type' => 'submit',
+    '#value' => t('Remove'),
+    '#submit' => array('editor_note_confirm_remove_form_remove'),
+  );
+
+  return $form;
+}
+
+/**
+ * Cancel callback for 'editor_note_confirm_remove_form'.
+ */
+function editor_note_confirm_remove_form_cancel(&$form, &$form_state) {
+  // Closes the modal.
+  $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+  // Removes previous status message.
+  // @todo make selector unique because it can be 2 fields added, use field name as a part of class.
+  $remove_message = '<div class="editor_note_status_message"></div>';
+  $form_state['ajax_commands'][] = ajax_command_replace('.editor_note_status_message', $remove_message);
+}
+
+/**
+ * Remove callback for 'editor_note_confirm_remove_form'.
+ */
+function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
+  editor_note_delete($form_state['values']['note_id']);
+  // Closes the modal.
+  $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+  // Inserts remove message.
+  // @todo make selector unique because it can be 2 fields added, use field name as a part of class.
+  $remove_message = '<div class="editor_note_status_message"><div class="messages status">' . t('Note has been removed.') . '</div></div>';
+  $form_state['ajax_commands'][] = ajax_command_replace('.editor_note_status_message', $remove_message);
+}
+
+/**
+ * Builds confirmation page for removing a note.
+ * @todo http://deeson-online.co.uk/labs/insert-form-pop-modal-ctools-and-drupal-7
+ */
+function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
+  if ($id == NULL) {
+    // @todo or 404 page ?
+    return t('Error: no note id was sent.');
+  }
+
+  if ($ajax) {
+    ctools_include('ajax');
+    ctools_include('modal');
+
+    $form_state = array(
+      'ajax' => TRUE,
+      'title' => t('Are you sure you want to delete note?'),
+    );
+
+    $output = ctools_modal_form_wrapper('editor_note_confirm_remove_form', $form_state);
+    // If the form has been submitted, there may be additional instructions
+    // such as dismissing the modal popup.
+    if (!empty($form_state['ajax_commands'])) {
+      $output = $form_state['ajax_commands'];
+    }
+
+    // Return the ajax instructions to the browser via ajax_render().
+    print ajax_render($output);
+    drupal_exit();
+  }
+  else {
+    return drupal_get_form('editor_note_confirm_remove_form', $id);
   }
 }
