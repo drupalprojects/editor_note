@@ -12,6 +12,7 @@
  * @todo test with revisions
  * @todo add detailed README.txt and hook_help
  * @todo add wysiwyg/filtered text support in the future
+ * @todo think about CRUD permissions on editor note entity.
  */
 
 /**
@@ -32,11 +33,23 @@ function editor_note_menu() {
     'title' => 'Remove Note',
     'page arguments' => array(2, 3),
     'page callback' => 'editor_note_confirm_remove_page',
-    'access callback' => TRUE, // @todo define access callback, it must be the user authored the note.
+    'access callback' => 'editor_note_access_remove',
+    'access arguments' => array(3),
     'type' => MENU_NORMAL_ITEM,
   );
 
   return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function editor_note_permission() {
+  return array(
+    'administer any editor note' => array(
+      'title' => t('Administer any editor note'),
+    ),
+  );
 }
 
 /**
@@ -592,7 +605,7 @@ function editor_note_theme_widget_form($variables, $element) {
     '#theme' => 'html_tag',
     '#tag' => 'div',
     '#attributes' => array(
-      'class' => array('editor_note_status_message'), // @todo make it unique for each field
+      'id' => array('status_message_' . $element['#field_name']),
     ),
     '#value' => '',
   );
@@ -762,7 +775,10 @@ function editor_note_get_notes($entity_type, $entity, $field) {
  * @return array
  */
 function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
-  $formatted_notes = array();
+  $formatted_notes = array(
+    '#prefix' => '<div id="formatted_notes_' . $field['field_name'] . '">',
+    '#suffix' => '</div>',
+  );
 
   if (!empty($notes)) {
     global $user;
@@ -829,7 +845,6 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
           array(
             'items' => array(
               l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
-            //  l(t('remove'), '', array('attributes' => array('class' => array('remove-note'), 'data-delta' => $note_id))),
               l(t('remove'), 'editor_note/remove/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal')))
             )
           )
@@ -854,26 +869,29 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
 
     if ($field['settings']['pager']['enabled'] && count($notes) == $field['settings']['limit']) {
       if ($field['settings']['pager']['pager_below']) {
-        $formatted_notes = array(
-          'notes_table' => $notes_table,
-          'notes_table_pager' => array('#theme' => 'pager'),
-        );
+        $formatted_notes['notes_table'] = $notes_table;
+        $formatted_notes['notes_table_pager'] = array('#theme' => 'pager');
       }
       else {
-        $formatted_notes = array(
-          'notes_table_pager' => array('#theme' => 'pager'),
-          'notes_table' => $notes_table,
-        );
+        $formatted_notes['notes_table_pager'] = array('#theme' => 'pager');
+        $formatted_notes['notes_table'] = $notes_table;
       }
     }
     else {
-      $formatted_notes = array(
-        'notes_table' => $notes_table,
-      );
+      $formatted_notes['notes_table'] = $notes_table;
     }
   }
 
   return $formatted_notes;
+}
+
+/**
+ * Defines access callback for 'remove note' action.
+ */
+function editor_note_access_remove($note_id) {
+  global $user;
+  $note_uid = db_query('SELECT en.uid FROM {editor_note} en WHERE id = :id', array(':id' => $note_id))->fetchField();
+  return user_access('administer any editor note') || $user->uid == $note_uid;
 }
 
 /**
@@ -943,33 +961,42 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
  * Cancel callback for 'editor_note_confirm_remove_form'.
  */
 function editor_note_confirm_remove_form_cancel(&$form, &$form_state) {
+  $field_name = $form_state['values']['note_field_name'];
+
   // Closes the modal.
   $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+
   // Removes previous status message.
-  // @todo make selector unique because it can be 2 fields added, use field name as a part of class.
-  $remove_message = '<div class="editor_note_status_message"></div>';
-  $form_state['ajax_commands'][] = ajax_command_replace('.editor_note_status_message', $remove_message);
+  $remove_message = '<div id="status_message_' . $field_name . '"></div>';
+  $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $remove_message);
 }
 
 /**
  * Remove callback for 'editor_note_confirm_remove_form'.
  */
 function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
+  $field_name = $form_state['values']['note_field_name'];
+  $entity_type = $form_state['values']['note_entity_type'];
+  $entity_id = $form_state['values']['note_entity_id'];
+  $note_id = $form_state['values']['note_entity_id'];
+
+  // Removes entity from the database
   editor_note_delete($form_state['values']['note_id']);
+
   // Closes the modal.
   $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
-  // Inserts remove message.
-  // @todo make selector unique because it can be 2 fields added, use field name as a part of class.
-  $remove_message = '<div class="editor_note_status_message"><div class="messages status">' . t('Note has been removed.') . '</div></div>';
-  $form_state['ajax_commands'][] = ajax_command_replace('.editor_note_status_message', $remove_message);
 
-  $field = field_info_field($form_state['values']['note_field_name']);
-  $entity_array = entity_load($form_state['values']['entity_type'], array($form_state['values']['entity_id']));
-  // @todo check if node has been loaded, test code below.
-  $entity = $entity_array[$form_state['values']['entity_id']];
-  $notes = editor_note_get_notes($form_state['values']['entity_type'], $entity, $field);
+  // Inserts remove message.
+  $remove_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been removed.') . '</div></div>';
+  $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $remove_message);
+
+  // Updates notes table and pager.
+  $field = field_info_field($field_name);
+  $entity_array = entity_load($entity_type, array($entity_id));
+  $entity = $entity_array[$note_id];
+  $notes = editor_note_get_notes($entity_type, $entity, $field);
   $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
-  $form_state['ajax_commands'][] = ajax_command_replace('.field-notes-table', drupal_render($formatted_notes));
+  $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
 }
 
 /**
@@ -978,7 +1005,6 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
  */
 function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
   if ($id == NULL) {
-    // @todo or 404 page ?
     return t('Error: no note id was sent.');
   }
 
@@ -988,7 +1014,7 @@ function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
 
     $form_state = array(
       'ajax' => TRUE,
-      'title' => t('Are you sure you want to delete note?'),
+      'title' => t('Are you sure you want to delete the note?'),
     );
 
     $output = ctools_modal_form_wrapper('editor_note_confirm_remove_form', $form_state);
@@ -998,7 +1024,7 @@ function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
       $output = $form_state['ajax_commands'];
     }
 
-    // Return the ajax instructions to the browser via ajax_render().
+    // Returns the ajax instructions to the browser via ajax_render().
     print ajax_render($output);
     drupal_exit();
   }
