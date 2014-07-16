@@ -13,6 +13,9 @@
  * @todo add detailed README.txt and hook_help
  * @todo add wysiwyg/filtered text support in the future
  * @todo think about CRUD permissions on editor note entity.
+ * @todo remove notes on entity delete.
+ * @todo test with other types of entities.
+ * @todo check if field is available in $entity object.
  */
 
 /**
@@ -327,7 +330,19 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       ),
     );
 
-    $element['id'] = array(
+    // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
+    $element['note_add'] = array(
+      '#type' => 'submit',
+      '#name' => $field['field_name'] . '_add_note',
+      '#value' => t('Add Note'),
+      '#submit' => array('editor_note_ajax_submit'), // @todo make sure that validation works before note is adding.
+      '#ajax' => array(
+        'callback' => 'editor_note_add_note',
+        'event' => 'click',
+      ),
+    );
+
+    $element['note_id'] = array(
       '#type' => 'hidden',
       '#default_value' => isset($items[$delta]['id']) ? $items[$delta]['id'] : '',
     );
@@ -574,8 +589,7 @@ function editor_note_theme_field_multiple_value_form($variables) {
  */
 function editor_note_theme_widget_form($variables, $element) {
   $output = array();
-  $add_note_field = array();
-  $add_note_button = array();
+  $add_note_widget = array();
 
   $field = field_info_field($element['#field_name']);
   $notes = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity'], $field);
@@ -583,22 +597,16 @@ function editor_note_theme_widget_form($variables, $element) {
 
   // Cardinality by default -1 for unlimited values.
   if ($field['cardinality'] < 0 || count($notes) < $field['cardinality']) {
-    $add_note_field = $element[0];
+    $add_note_widget = $element[0];
     $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
     if ($required) {
       // Adds required mark to the title of 'Add Note' field.
-      $add_note_field['note']['#title'] .= $required;
+      $add_note_widget['note']['#title'] .= $required;
     }
-    if (isset($add_note_field['_weight'])) {
+    if (isset($add_note_widget['_weight'])) {
       // Hides $items['_weight'] from display.
-      $add_note_field['_weight']['#attributes']['class'][] = 'element-invisible';
+      $add_note_widget['_weight']['#attributes']['class'][] = 'element-invisible';
     }
-    // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
-    $add_note_button = array(
-      '#type' => 'submit',
-      '#name' => $element['#field_name'] . '_save_note',
-      '#value' => t('Add Note'),
-    );
   }
 
   $status_message_container = array(
@@ -610,22 +618,21 @@ function editor_note_theme_widget_form($variables, $element) {
     '#value' => '',
   );
 
-  // Load the modal library and add the modal javascript.
-  ctools_include('modal');
-  ctools_modal_add_js();
-
   if ($field['settings']['display']) {
-    $output[] = drupal_render($add_note_field);
-    $output[] = drupal_render($add_note_button);
+    $output[] = drupal_render($add_note_widget);
     $output[] = drupal_render($status_message_container);
     $output[] = drupal_render($formatted_notes);
   }
   else {
     $output[] = drupal_render($formatted_notes);
     $output[] = drupal_render($status_message_container);
-    $output[] = drupal_render($add_note_field);
-    $output[] = drupal_render($add_note_button);
+    $output[] = drupal_render($add_note_widget);
   }
+
+  // @todo modify ctools popup here and pass settings to js.
+  // Load the modal library and add the modal javascript.
+  ctools_include('modal');
+  ctools_modal_add_js();
 
   return '<div class="form-item">' . implode('', $output) . '</div>';
 }
@@ -907,6 +914,15 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   }
 }
 
+/**
+ * Builds confirmation form which displays in popup.
+ *
+ * @param $form
+ * @param $form_state
+ * @param $id
+ *
+ * @return array
+ */
 function editor_note_confirm_remove_form($form, $form_state, $id) {
   $form = array();
   $note = editor_note_load(arg(3)); // @todo check if note has been loaded
@@ -980,7 +996,7 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   $entity_id = $form_state['values']['note_entity_id'];
   $note_id = $form_state['values']['note_entity_id'];
 
-  // Removes entity from the database
+  // Removes note entity from the database.
   editor_note_delete($form_state['values']['note_id']);
 
   // Closes the modal.
@@ -1000,8 +1016,46 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
 }
 
 /**
+ * Submit callaback for 'editor_note_field_widget_form'.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function editor_note_ajax_submit(&$form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+}
+
+/**
+ * 'Add note' ajax callback for 'editor_note_field_widget_form'.
+ */
+function editor_note_add_note(&$form, &$form_state) {
+  $ajax_commands = array();
+  $entity_type = $form['#entity_type'];
+  $entity = $form['#entity'];
+  $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
+  $note = $form_state['values'][$field_name][LANGUAGE_NONE][0]['note'];
+
+  // Adds note entity to the database.
+  editor_note_save($note, $entity_type, $entity, $field_name);
+
+  // Inserts remove message.
+  $add_note_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been added and saved.') . '</div></div>';
+  $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $add_note_message);
+
+  // Updates notes table and pager.
+  $field = field_info_field($field_name);
+  $notes = editor_note_get_notes($entity_type, $entity, $field);
+  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+  $ajax_commands[] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+
+  return array(
+    '#type' => 'ajax',
+    '#commands' => $ajax_commands,
+  );
+}
+
+/**
  * Builds confirmation page for removing a note.
- * @todo http://deeson-online.co.uk/labs/insert-form-pop-modal-ctools-and-drupal-7
  */
 function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
   if ($id == NULL) {
