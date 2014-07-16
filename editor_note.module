@@ -165,7 +165,7 @@ function editor_note_field_info() {
       'label' => t('Editor Notes'),
       'description' => t('Field for taking editor notes.'),
       'settings' => array(
-        'notes_size' => 3,
+        'notes_size' => 5,
         'notes_placeholder' => 'Create a note',
         'notes_maxlength' => 0,
         'limit' => 10,
@@ -295,8 +295,9 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
 function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
     // Update cardinality field.
+    // @todo think again about cardinality - better 1 and create custom field for it? Because element with delta 1 is not used at all.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
-      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100)); // @todo think again about cardinality - better 1 and create custom field for it? Because element with delta 1 is not used at all.
+      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
     $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
       $form['field']['cardinality']['#default_value'] : -1;
     $form['field']['cardinality']['#description'] = t('Maximum number of values that field can store.');
@@ -327,9 +328,6 @@ function editor_note_field_widget_info() {
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   if ($field['type'] == 'editor_note') {
-    list($entity_id) = entity_extract_ids($instance['entity_type'], $form['#node']);
-
-    // @todo ensure that all labels and descriptions are translatable.
     $element['note'] = array(
       '#type' => 'textarea',
       '#prefix' => '<div id="textarea_' . $field['field_name'] . '">',
@@ -338,11 +336,16 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
       '#description' => check_plain($instance['description']),
       '#rows' => $field['settings']['notes_size'],
+      '#resizable' => FALSE,
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
         'placeholder' => t($field['settings']['notes_placeholder']),
       ),
     );
+
+    if (isset($instance['entity_type']) && isset($form['#entity'])) {
+      list($entity_id) = entity_extract_ids($instance['entity_type'], $form['#entity']);
+    }
 
     if (isset($entity_id)) {
       // Display 'Add Note' button only if entity has been already created and stored in the database.
@@ -576,7 +579,7 @@ function editor_note_theme_registry_alter(&$theme_registry) {
  * Overrides multiple-value form widget for 'notes' field widget form.
  * @see theme_field_multiple_value_form().
  *
- * @param $variables
+ * @param array $variables
  *
  * @return array
  */
@@ -599,8 +602,8 @@ function editor_note_theme_field_multiple_value_form($variables) {
 /**
  * Custom widget form for 'notes' field.
  *
- * @param $variables
- * @param $element
+ * @param array $variables
+ * @param array $element
  *
  * @return string
  */
@@ -646,24 +649,19 @@ function editor_note_theme_widget_form($variables, $element) {
     $output[] = drupal_render($add_note_widget);
   }
 
-  // @todo modify ctools popup here and pass settings to js.
-  // Load the modal library and add the modal javascript.
-  ctools_include('modal');
-  ctools_modal_add_js();
-
   return '<div class="form-item">' . implode('', $output) . '</div>';
 }
 
 /**
- * Saves Editor Note.
+ * Saves note.
  *
- * @param $note
- * @param $entity_type
- * @param $entity
- * @param $field_name
- * @param null $uid
- * @param null $created
- * @param null $changed
+ * @param string $note
+ * @param string $entity_type
+ * @param object $entity
+ * @param string $field_name
+ * @param int|string|null $uid
+ * @param int|string|null $created
+ * @param int|string|null $changed
  */
 function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL, $created = NULL, $changed = NULL) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
@@ -691,13 +689,13 @@ function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL
 }
 
 /**
- * Loads single Editor Note based on certain conditions.
+ * Loads single note based on certain conditions.
  *
- * @param $note_id
+ * @param int|string $note_id
  * @param array $conditions
  * @param bool $reset
  *
- * @return mixed
+ * @return int|bool
  */
 function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
   $note_array = entity_load('editor_note', array($note_id), $conditions, $reset);
@@ -709,20 +707,20 @@ function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
 }
 
 /**
- * Loads multiple Editor Notes based on certain conditions.
+ * Loads multiple notes based on certain conditions.
  *
  * @param $note_ids
  * @param array $conditions
  * @param bool $reset
  *
- * @return mixed
+ * @return bool|object
  */
 function editor_note_load_multiple($note_ids, $conditions = array(), $reset = FALSE) {
   return entity_load('editor_note', $note_ids, $conditions, $reset);
 }
 
 /**
- * Deletes single Editor Notes.
+ * Deletes single note.
  *
  * @param $note_id
  */
@@ -731,9 +729,9 @@ function editor_note_delete($note_id) {
 }
 
 /**
- * Deletes multiple Editor Notes.
+ * Deletes multiple notes.
  *
- * @param $note_ids
+ * @param int|string $note_ids
  */
 function editor_note_delete_multiple($note_ids) {
   entity_delete_multiple('editor_note', $note_ids);
@@ -742,10 +740,9 @@ function editor_note_delete_multiple($note_ids) {
 /**
  * Returns array of notes per entity revision.
  *
- * @param $entity_type
- * @param $entity
- * @param $field
- * @param $instance
+ * @param string $entity_type
+ * @param object $entity
+ * @param array $field
  *
  * @return mixed
  */
@@ -792,9 +789,9 @@ function editor_note_get_notes($entity_type, $entity, $field) {
 /**
  * Returns formatted notes table.
  *
- * @param $field
- * @param $notes
- * @param $widget
+ * @param array $field
+ * @param array $notes
+ * @param bool $widget
  *
  * @return array
  */
@@ -833,8 +830,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
         'class' => array('field-operations'),
       );
 
-      ctools_include('modal');
-      ctools_modal_add_js();
+      editor_note_add_ctools_support($field['field_name']);
     }
 
     foreach ($notes as $note_id => $item) {
@@ -863,12 +859,31 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       );
 
       if ($widget) {
-        $operations = !editor_note_access_crud_operation($note_id) ? '' : theme('item_list',
+        $operations = !editor_note_access_crud_operation($note_id) ? '' : theme(
+          'item_list',
           array(
             'items' => array(
-              l(t('edit'), 'editor_note/edit/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal'))),
-              l(t('remove'), 'editor_note/remove/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal')))
-            )
+              ctools_modal_text_button(t('edit'), 'editor_note/edit/nojs/' . $note_id, t('Edit the note'),  'ctools-modal-' . $field['field_name'] . '-edit'),
+              ctools_modal_text_button(t('remove'), 'editor_note/remove/nojs/' . $note_id, t('Remove the note'),  'ctools-modal-' . $field['field_name'] . '-remove'),
+//              l(
+//                t('edit'),
+//                'editor_note/edit/nojs/' . $note_id,
+//                array(
+//                  'attributes' => array(
+//                    'class' => array('ctools-use-modal', 'ctools-modal-' . 'ctools-' . $field['field_name'] . '-remove'),
+//                  ),
+//                )
+//              ),
+//              l(
+//                t('remove'),
+//                'editor_note/remove/nojs/' . $note_id,
+//                array(
+//                  'attributes' => array(
+//                    'class' => array('ctools-use-modal', 'ctools-modal-' . 'ctools-' . $field['field_name'] . '-edit'),
+//                  ),
+//                )
+//              )
+            ),
           )
         );
         $rows[$counter]['data']['operations'] = array(
@@ -890,6 +905,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
 
     // @todo check pager which gets broken after ajax refresh.
     // @todo how to distinguish 2 pagers on the page.
+    // @todo pager disappears on the last page.
     if ($field['settings']['pager']['enabled'] && count($notes) == $field['settings']['limit']) {
       if ($field['settings']['pager']['pager_below']) {
         $formatted_notes['notes_table'] = $notes_table;
@@ -910,6 +926,10 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
 
 /**
  * Defines access callback for CRUD operations.
+ *
+ * @param int|string $note_id
+ *
+ * @return bool
  */
 function editor_note_access_crud_operation($note_id) {
   global $user;
@@ -919,10 +939,10 @@ function editor_note_access_crud_operation($note_id) {
 }
 
 /**
- * Form element validation handler for integer elements that must be positive or 0.
+ * Creates form element validation handler for integer elements that must be positive or 0.
  *
- * @param $element
- * @param $form_state
+ * @param array $element
+ * @param array $form_state
  */
 function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   $value = $element['#value'];
@@ -934,9 +954,9 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 /**
  * Builds confirmation form for removing the note which displays in popup.
  *
- * @param $form
- * @param $form_state
- * @param $id
+ * @param array $form
+ * @param array $form_state
+ * @param int|string $id
  *
  * @return array
  */
@@ -972,7 +992,7 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
     $form['actions'] = array(
       '#type' => 'container',
       '#attributes' => array(
-        'class' => array('element-inline'),
+        'class' => array('element-inline', 'editor-note-actions'),
       ),
     );
 
@@ -1004,7 +1024,10 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
 }
 
 /**
- * Cancel callback for 'editor_note_confirm_remove_form'.
+ * Ajax callback for 'Cancel' button in 'editor_note_confirm_remove_form'.
+ *
+ * @param array $form
+ * @param array $form_state
  */
 function editor_note_confirm_form_cancel(&$form, &$form_state) {
   $field_name = $form_state['values']['note_field_name'];
@@ -1018,7 +1041,10 @@ function editor_note_confirm_form_cancel(&$form, &$form_state) {
 }
 
 /**
- * Remove callback for 'editor_note_confirm_remove_form'.
+ * Ajax callback for 'Remove' button in 'editor_note_confirm_remove_form'.
+ *
+ * @param array $form
+ * @param array $form_state
  */
 function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   $field_name = $form_state['values']['note_field_name'];
@@ -1048,9 +1074,9 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
 /**
  * Builds confirmation form for editing the note which displays in popup.
  *
- * @param $form
- * @param $form_state
- * @param $id
+ * @param array $form
+ * @param array $form_state
+ * @param int|string $id
  *
  * @return array
  */
@@ -1067,6 +1093,7 @@ function editor_note_confirm_edit_form($form, $form_state, $id) {
       '#default_value' => $note->note,
       '#required' => TRUE,
       '#rows' => $field['settings']['notes_size'],
+      '#resizable' => FALSE,
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
         'placeholder' => t($field['settings']['notes_placeholder']),
@@ -1096,7 +1123,7 @@ function editor_note_confirm_edit_form($form, $form_state, $id) {
     $form['actions'] = array(
       '#type' => 'container',
       '#attributes' => array(
-        'class' => array('element-inline'),
+        'class' => array('element-inline', 'editor-note-actions'),
       ),
     );
 
@@ -1128,10 +1155,10 @@ function editor_note_confirm_edit_form($form, $form_state, $id) {
 }
 
 /**
- * Update callback for 'editor_note_confirm_edit_form'.
+ * Ajax callback for 'Update' button in 'editor_note_confirm_edit_form'.
  *
- * @param $form
- * @param $form_state
+ * @param array $form
+ * @param array $form_state
  */
 function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $field_name = $form_state['values']['note_field_name'];
@@ -1149,7 +1176,7 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
   // Inserts remove message.
-  $update_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been updated.') . '</div></div>';
+  $update_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been updated and saved.') . '</div></div>';
   $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $update_message);
 
   // Updates notes table and pager.
@@ -1161,7 +1188,12 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
 }
 
 /**
- * 'Add note' ajax callback for 'editor_note_field_widget_form'.
+ * Ajax callback for 'Add note' button in 'editor_note_field_widget_form'.
+ *
+ * @param array $form
+ * @param array $form_state
+ *
+ * @return array
  */
 function editor_note_add_note(&$form, &$form_state) {
   $ajax_commands = array();
@@ -1207,8 +1239,8 @@ function editor_note_add_note(&$form, &$form_state) {
 /**
  * Validate callback for 'editor_note_field_widget_form'.
  *
- * @param $form
- * @param $form_state
+ * @param array $form
+ * @param array $form_state
  */
 function editor_note_add_note_validate(&$form, &$form_state) {
   $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
@@ -1221,8 +1253,8 @@ function editor_note_add_note_validate(&$form, &$form_state) {
 /**
  * Submit callback for 'editor_note_field_widget_form'.
  *
- * @param $form
- * @param $form_state
+ * @param array $form
+ * @param array $form_state
  */
 function editor_note_add_note_submit(&$form, &$form_state) {
   $form_state['rebuild'] = TRUE;
@@ -1231,8 +1263,8 @@ function editor_note_add_note_submit(&$form, &$form_state) {
 /**
  * Builds confirmation page for removing selected note.
  *
- * @param null $ajax
- * @param null $id
+ * @param string|null $ajax
+ * @param string|int|null $id
  *
  * @return null|array
  */
@@ -1269,8 +1301,8 @@ function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
 /**
  * Builds confirmation page for updating selected note.
  *
- * @param null $ajax
- * @param null $id
+ * @param string|null $ajax
+ * @param string|int|null $id
  *
  * @return null|array
  */
@@ -1285,7 +1317,7 @@ function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
 
     $form_state = array(
       'ajax' => TRUE,
-      'title' => t('Update the note'),
+      'title' => t('Update selected item'),
     );
 
     $output = ctools_modal_form_wrapper('editor_note_confirm_edit_form', $form_state);
@@ -1302,4 +1334,52 @@ function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
   else {
     return drupal_get_form('editor_note_confirm_edit_form', $id);
   }
+}
+
+/**
+ * Enables support of CTools module for Ajax operations.
+ *
+ * @param $field_name
+ */
+function editor_note_add_ctools_support($field_name) {
+  // Include the CTools tools that we need.
+  ctools_include('ajax');
+  ctools_include('modal');
+
+  // Add CTools' javascript to the page.
+  ctools_modal_add_js();
+
+  // Create our own javascript settings that will be used to theme a modal.
+  $modal_styles = array(
+    $field_name . '-remove' => array(
+      'modalSize' => array(
+        'type' => 'fixed',
+        'width' => 320,
+        'height' => 'auto',
+      ),
+      'modalOptions' => array(
+        'opacity' => 0.7,
+        'background-color' => '#000',
+      ),
+      'animation' => 'show',
+    ),
+    $field_name . '-edit' => array(
+      'modalSize' => array(
+        'type' => 'fixed',
+        'width' => 600,
+        'height' => 'auto',
+      ),
+      'modalOptions' => array(
+        'opacity' => 0.7,
+        'background-color' => '#000',
+      ),
+      'animation' => 'show',
+    ),
+  );
+
+  // Pass CTools modal settings to js.
+  drupal_add_js($modal_styles, 'setting');
+
+  // Add custom css to style popups.
+  ctools_add_css('editor-note-ctools-style', 'editor_note');
 }
