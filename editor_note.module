@@ -32,11 +32,20 @@ function editor_note_help($path, $arg) {
  *  Implements hook_menu().
  */
 function editor_note_menu() {
+  $items['editor_note/edit/%ctools_js/%'] = array(
+    'title' => 'Update Note',
+    'page arguments' => array(2, 3),
+    'page callback' => 'editor_note_confirm_edit_page',
+    'access callback' => 'editor_note_access_crud_operation',
+    'access arguments' => array(3),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
   $items['editor_note/remove/%ctools_js/%'] = array(
     'title' => 'Remove Note',
     'page arguments' => array(2, 3),
     'page callback' => 'editor_note_confirm_remove_page',
-    'access callback' => 'editor_note_access_remove',
+    'access callback' => 'editor_note_access_crud_operation',
     'access arguments' => array(3),
     'type' => MENU_NORMAL_ITEM,
   );
@@ -847,11 +856,11 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       );
 
       if ($widget) {
-        // @todo implement ajax controls in operations to edit or remove notes
+        // @todo check permissions here
         $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
           array(
             'items' => array(
-              l(t('edit'), '', array('attributes' => array('class' => array('edit-note'), 'data-delta' => $note_id))),
+              l(t('edit'), 'editor_note/edit/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal'))),
               l(t('remove'), 'editor_note/remove/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal')))
             )
           )
@@ -874,6 +883,8 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       )
     );
 
+    // @todo check pager which gets broken after ajax refresh.
+    // @todo how to distinguish 2 pagers on the page.
     if ($field['settings']['pager']['enabled'] && count($notes) == $field['settings']['limit']) {
       if ($field['settings']['pager']['pager_below']) {
         $formatted_notes['notes_table'] = $notes_table;
@@ -893,9 +904,9 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
 }
 
 /**
- * Defines access callback for 'remove note' action.
+ * Defines access callback for CRUD operations.
  */
-function editor_note_access_remove($note_id) {
+function editor_note_access_crud_operation($note_id) {
   global $user;
   $note_uid = db_query('SELECT en.uid FROM {editor_note} en WHERE id = :id', array(':id' => $note_id))->fetchField();
   return user_access('administer any editor note') || $user->uid == $note_uid;
@@ -915,7 +926,7 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 }
 
 /**
- * Builds confirmation form which displays in popup.
+ * Builds confirmation form for removing the note which displays in popup.
  *
  * @param $form
  * @param $form_state
@@ -961,7 +972,7 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
   $form['actions']['cancel'] = array(
     '#type' => 'submit',
     '#value' => t('Cancel'),
-    '#submit' => array('editor_note_confirm_remove_form_cancel'),
+    '#submit' => array('editor_note_confirm_form_cancel'),
   );
 
   $form['actions']['delete'] = array(
@@ -976,7 +987,7 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
 /**
  * Cancel callback for 'editor_note_confirm_remove_form'.
  */
-function editor_note_confirm_remove_form_cancel(&$form, &$form_state) {
+function editor_note_confirm_form_cancel(&$form, &$form_state) {
   $field_name = $form_state['values']['note_field_name'];
 
   // Closes the modal.
@@ -1016,19 +1027,105 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
 }
 
 /**
- * Submit callaback for 'editor_note_field_widget_form'.
+ * Builds confirmation form for editing the note which displays in popup.
+ *
+ * @param $form
+ * @param $form_state
+ * @param $id
+ *
+ * @return array
+ */
+function editor_note_confirm_edit_form($form, $form_state, $id) {
+  $form = array();
+  $note = editor_note_load(arg(3)); // @todo check if note has been loaded
+
+  $form['note'] = array(
+    '#type' => 'textarea', // @todo implement size exactly as defined in settings.
+    '#title' => t('Update Note'),
+    '#default_value' => $note->note,
+    '#required' => TRUE,
+  );
+
+  $form['note_id'] = array(
+    '#type' => 'value',
+    '#value' => $note->id,
+  );
+
+  $form['note_entity_type'] = array(
+    '#type' => 'value',
+    '#value' => $note->entity_type,
+  );
+
+  $form['note_entity_id'] = array(
+    '#type' => 'value',
+    '#value' => $note->entity_id,
+  );
+
+  $form['note_field_name'] = array(
+    '#type' => 'value',
+    '#value' => $note->field_name,
+  );
+
+  $form['actions'] = array(
+    '#type' => 'container',
+    '#attributes' => array(
+      'class' => array('element-inline'),
+    ),
+  );
+
+  $form['actions']['cancel'] = array(
+    '#type' => 'submit',
+    '#value' => t('Cancel'),
+    '#submit' => array('editor_note_confirm_form_cancel'),
+  );
+
+  $form['actions']['update'] = array(
+    '#type' => 'submit',
+    '#value' => t('Update'),
+    '#submit' => array('editor_note_confirm_edit_form_update'),
+  );
+
+  return $form;
+}
+
+/**
+ * Update callback for 'editor_note_confirm_edit_form'.
  *
  * @param $form
  * @param $form_state
  */
-function editor_note_ajax_submit(&$form, &$form_state) {
-  $form_state['rebuild'] = TRUE;
+function editor_note_confirm_edit_form_update(&$form, &$form_state) {
+  $field_name = $form_state['values']['note_field_name'];
+  $entity_type = $form_state['values']['note_entity_type'];
+  $entity_id = $form_state['values']['note_entity_id'];
+  $note_id = $form_state['values']['note_id'];
+  $field = field_info_field($field_name);
+
+  // Updates note entity in the database.
+  $note = editor_note_load($note_id);
+  $note->note = $form_state['values']['note'];
+  $note->save();
+
+  // Closes the modal.
+  $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+
+  // Inserts remove message.
+  $update_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been updated.') . '</div></div>';
+  $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $update_message);
+
+  // Updates notes table and pager.
+  $entity_array = entity_load($entity_type, array($entity_id));
+  $entity = $entity_array[$entity_id];
+  $notes = editor_note_get_notes($entity_type, $entity, $field);
+  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+  $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
 }
 
 /**
  * 'Add note' ajax callback for 'editor_note_field_widget_form'.
  */
 function editor_note_add_note(&$form, &$form_state) {
+  // @todo rebuild textarea to return blank.
   $ajax_commands = array();
   $entity_type = $form['#entity_type'];
   $entity = $form['#entity'];
@@ -1055,7 +1152,22 @@ function editor_note_add_note(&$form, &$form_state) {
 }
 
 /**
- * Builds confirmation page for removing a note.
+ * Submit callback for 'editor_note_field_widget_form'.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function editor_note_ajax_submit(&$form, &$form_state) {
+  $form_state['rebuild'] = TRUE;
+}
+
+/**
+ * Builds confirmation page for removing selected note.
+ *
+ * @param null $ajax
+ * @param null $id
+ *
+ * @return null|array
  */
 function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
   if ($id == NULL) {
@@ -1084,5 +1196,43 @@ function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
   }
   else {
     return drupal_get_form('editor_note_confirm_remove_form', $id);
+  }
+}
+
+/**
+ * Builds confirmation page for updating selected note.
+ *
+ * @param null $ajax
+ * @param null $id
+ *
+ * @return null|array
+ */
+function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
+  if ($id == NULL) {
+    return t('Error: no note id was sent.');
+  }
+
+  if ($ajax) {
+    ctools_include('ajax');
+    ctools_include('modal');
+
+    $form_state = array(
+      'ajax' => TRUE,
+      'title' => t('Update the note'),
+    );
+
+    $output = ctools_modal_form_wrapper('editor_note_confirm_edit_form', $form_state);
+    // If the form has been submitted, there may be additional instructions
+    // such as dismissing the modal popup.
+    if (!empty($form_state['ajax_commands'])) {
+      $output = $form_state['ajax_commands'];
+    }
+
+    // Returns the ajax instructions to the browser via ajax_render().
+    print ajax_render($output);
+    drupal_exit();
+  }
+  else {
+    return drupal_get_form('editor_note_confirm_edit_form', $id);
   }
 }
