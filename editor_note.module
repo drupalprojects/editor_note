@@ -296,7 +296,7 @@ function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $
   if ($form['#field']['type'] == 'editor_note') {
     // Update cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
-      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
+      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100)); // @todo think again about cardinality - better 1 and create custom field for it? Because element with delta 1 is not used at all.
     $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
       $form['field']['cardinality']['#default_value'] : -1;
     $form['field']['cardinality']['#description'] = t('Maximum number of values that field can store.');
@@ -327,34 +327,44 @@ function editor_note_field_widget_info() {
  */
 function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
   if ($field['type'] == 'editor_note') {
+    list($entity_id) = entity_extract_ids($instance['entity_type'], $form['#node']);
+
     // @todo ensure that all labels and descriptions are translatable.
     $element['note'] = array(
       '#type' => 'textarea',
+      '#prefix' => '<div id="textarea_' . $field['field_name'] . '">',
+      '#suffix' => '</div>',
       '#title' => check_plain($instance['label']),
       '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
       '#description' => check_plain($instance['description']),
+      '#rows' => $field['settings']['notes_size'],
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
         'placeholder' => t($field['settings']['notes_placeholder']),
       ),
     );
 
-    // @todo modify to save button so that it saves note via ajax, adds it as the next row and makes textarea blank.
-    $element['note_add'] = array(
-      '#type' => 'submit',
-      '#name' => $field['field_name'] . '_add_note',
-      '#value' => t('Add Note'),
-      '#submit' => array('editor_note_ajax_submit'), // @todo make sure that validation works before note is adding.
-      '#ajax' => array(
-        'callback' => 'editor_note_add_note',
-        'event' => 'click',
-      ),
-    );
+    if (isset($entity_id)) {
+      // Display 'Add Note' button only if entity has been already created and stored in the database.
+      $element['note_add'] = array(
+        '#type' => 'submit',
+        '#name' => $field['field_name'] . '_add_note',
+        '#value' => t('Add Note'),
+        '#submit' => array('editor_note_add_note_submit'),
+        '#validate' => array('editor_note_add_note_validate'),
+        '#limit_validation_errors' => array(array($field['field_name'])),
+        '#ajax' => array(
+          'callback' => 'editor_note_add_note',
+          'event' => 'click',
+        ),
+      );
 
-    $element['note_id'] = array(
-      '#type' => 'hidden',
-      '#default_value' => isset($items[$delta]['id']) ? $items[$delta]['id'] : '',
-    );
+      if (isset($form_state['triggering_element']['#name']) &&
+        $form_state['triggering_element']['#name'] == $field['field_name'] . '_add_note') {
+        // Fixing Ajax #default_value issue, @see https://drupal.org/node/1082818.
+        unset($form_state['input'][$field['field_name']][LANGUAGE_NONE][0]['note']);
+      }
+    }
   }
 
   return $element;
@@ -364,8 +374,6 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
  * Implements hook_field_validate().
  * Defines messages that will be shown on validation of widget form using hook_field_widget_error().
  */
-// @todo validate so that hacker cannot change values in hidden fields manually and then to save field of another user.
-// @todo validate if hacker enters manually invalid field id.
 function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
   if ($field['type'] == 'editor_note') {
     foreach ($items as $delta => $item) {
@@ -797,7 +805,6 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
   );
 
   if (!empty($notes)) {
-    global $user;
     $rows = array();
     $counter = 0;
 
@@ -856,8 +863,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       );
 
       if ($widget) {
-        // @todo check permissions here
-        $operations = ($user->uid != $item->uid && $user->uid != 1) ? '' : theme('item_list',
+        $operations = !editor_note_access_crud_operation($note_id) ? '' : theme('item_list',
           array(
             'items' => array(
               l(t('edit'), 'editor_note/edit/nojs/' . $note_id, array('attributes' => array('class' => 'ctools-use-modal'))),
@@ -870,7 +876,6 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
           'class' => array('operations'),
         );
       }
-
       $counter++;
     }
 
@@ -908,7 +913,8 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
  */
 function editor_note_access_crud_operation($note_id) {
   global $user;
-  $note_uid = db_query('SELECT en.uid FROM {editor_note} en WHERE id = :id', array(':id' => $note_id))->fetchField();
+  $note_uid = db_query('SELECT en.uid FROM {editor_note} en WHERE id = :id',
+    array(':id' => $note_id))->fetchField();
   return user_access('administer any editor note') || $user->uid == $note_uid;
 }
 
@@ -936,50 +942,63 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
  */
 function editor_note_confirm_remove_form($form, $form_state, $id) {
   $form = array();
-  $note = editor_note_load(arg(3)); // @todo check if note has been loaded
+  $note = editor_note_load(arg(3));
 
-  $form['note'] = array(
-    '#markup' => '<p>' . t('Are you sure you want to remove the note? This action cannot be undone.') . '</p>',
-  );
+  if ($note) {
+    $form['note'] = array(
+      '#markup' => '<p>' . t('Are you sure you want to remove the note? This action cannot be undone.') . '</p>',
+    );
 
-  $form['note_id'] = array(
-    '#type' => 'value',
-    '#value' => $note->id,
-  );
+    $form['note_id'] = array(
+      '#type' => 'value',
+      '#value' => $note->id,
+    );
 
-  $form['note_entity_type'] = array(
-    '#type' => 'value',
-    '#value' => $note->entity_type,
-  );
+    $form['note_entity_type'] = array(
+      '#type' => 'value',
+      '#value' => $note->entity_type,
+    );
 
-  $form['note_entity_id'] = array(
-    '#type' => 'value',
-    '#value' => $note->entity_id,
-  );
+    $form['note_entity_id'] = array(
+      '#type' => 'value',
+      '#value' => $note->entity_id,
+    );
 
-  $form['note_field_name'] = array(
-    '#type' => 'value',
-    '#value' => $note->field_name,
-  );
+    $form['note_field_name'] = array(
+      '#type' => 'value',
+      '#value' => $note->field_name,
+    );
 
-  $form['actions'] = array(
-    '#type' => 'container',
-    '#attributes' => array(
-      'class' => array('element-inline'),
-    ),
-  );
+    $form['actions'] = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'class' => array('element-inline'),
+      ),
+    );
 
-  $form['actions']['cancel'] = array(
-    '#type' => 'submit',
-    '#value' => t('Cancel'),
-    '#submit' => array('editor_note_confirm_form_cancel'),
-  );
+    $form['actions']['cancel'] = array(
+      '#type' => 'submit',
+      '#value' => t('Cancel'),
+      '#submit' => array('editor_note_confirm_form_cancel'),
+    );
 
-  $form['actions']['delete'] = array(
-    '#type' => 'submit',
-    '#value' => t('Remove'),
-    '#submit' => array('editor_note_confirm_remove_form_remove'),
-  );
+    $form['actions']['delete'] = array(
+      '#type' => 'submit',
+      '#value' => t('Remove'),
+      '#submit' => array('editor_note_confirm_remove_form_remove'),
+    );
+  }
+  else {
+    $form['note'] = array(
+      '#markup' => '<p>' . t('Selected note could not be loaded. Cancel action and reload the page to refresh notes widget.') . '</p>',
+    );
+
+    $form['actions']['cancel'] = array(
+      '#type' => 'submit',
+      '#value' => t('Cancel'),
+      '#submit' => array('editor_note_confirm_form_cancel'),
+    );
+  }
 
   return $form;
 }
@@ -1037,53 +1056,73 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
  */
 function editor_note_confirm_edit_form($form, $form_state, $id) {
   $form = array();
-  $note = editor_note_load(arg(3)); // @todo check if note has been loaded
+  $note = editor_note_load(arg(3));
 
-  $form['note'] = array(
-    '#type' => 'textarea', // @todo implement size exactly as defined in settings.
-    '#title' => t('Update Note'),
-    '#default_value' => $note->note,
-    '#required' => TRUE,
-  );
+  if ($note) {
+    $field = field_info_field($note->field_name);
 
-  $form['note_id'] = array(
-    '#type' => 'value',
-    '#value' => $note->id,
-  );
+    $form['note'] = array(
+      '#type' => 'textarea',
+      '#title' => t('Update Note'),
+      '#default_value' => $note->note,
+      '#required' => TRUE,
+      '#rows' => $field['settings']['notes_size'],
+      '#attributes' => array(
+        'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
+        'placeholder' => t($field['settings']['notes_placeholder']),
+      ),
+    );
 
-  $form['note_entity_type'] = array(
-    '#type' => 'value',
-    '#value' => $note->entity_type,
-  );
+    $form['note_id'] = array(
+      '#type' => 'value',
+      '#value' => $note->id,
+    );
 
-  $form['note_entity_id'] = array(
-    '#type' => 'value',
-    '#value' => $note->entity_id,
-  );
+    $form['note_entity_type'] = array(
+      '#type' => 'value',
+      '#value' => $note->entity_type,
+    );
 
-  $form['note_field_name'] = array(
-    '#type' => 'value',
-    '#value' => $note->field_name,
-  );
+    $form['note_entity_id'] = array(
+      '#type' => 'value',
+      '#value' => $note->entity_id,
+    );
 
-  $form['actions'] = array(
-    '#type' => 'container',
-    '#attributes' => array(
-      'class' => array('element-inline'),
-    ),
-  );
+    $form['note_field_name'] = array(
+      '#type' => 'value',
+      '#value' => $note->field_name,
+    );
 
-  $form['actions']['cancel'] = array(
-    '#type' => 'submit',
-    '#value' => t('Cancel'),
-    '#submit' => array('editor_note_confirm_form_cancel'),
-  );
+    $form['actions'] = array(
+      '#type' => 'container',
+      '#attributes' => array(
+        'class' => array('element-inline'),
+      ),
+    );
 
-  $form['actions']['update'] = array(
-    '#type' => 'submit',
-    '#value' => t('Update'),
-    '#submit' => array('editor_note_confirm_edit_form_update'),
-  );
+    $form['actions']['cancel'] = array(
+      '#type' => 'submit',
+      '#value' => t('Cancel'),
+      '#submit' => array('editor_note_confirm_form_cancel'),
+    );
+
+    $form['actions']['update'] = array(
+      '#type' => 'submit',
+      '#value' => t('Update'),
+      '#submit' => array('editor_note_confirm_edit_form_update'),
+    );
+  }
+  else {
+    $form['note'] = array(
+      '#markup' => '<p>' . t('Selected note could not be loaded. Cancel action and reload the page to refresh notes widget.') . '</p>',
+    );
+
+    $form['actions']['cancel'] = array(
+      '#type' => 'submit',
+      '#value' => t('Cancel'),
+      '#submit' => array('editor_note_confirm_form_cancel'),
+    );
+  }
 
   return $form;
 }
@@ -1125,25 +1164,39 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
  * 'Add note' ajax callback for 'editor_note_field_widget_form'.
  */
 function editor_note_add_note(&$form, &$form_state) {
-  // @todo rebuild textarea to return blank.
   $ajax_commands = array();
   $entity_type = $form['#entity_type'];
   $entity = $form['#entity'];
   $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
   $note = $form_state['values'][$field_name][LANGUAGE_NONE][0]['note'];
+  $errors = form_get_errors();
 
-  // Adds note entity to the database.
-  editor_note_save($note, $entity_type, $entity, $field_name);
+  if (!empty($errors) && isset($errors[$field_name])) {
+    // Inserts validation message.
+    $add_note_message = '<div id="status_message_' . $field_name . '"><div class="messages error">' . $errors[$field_name] . '</div></div>';
+    $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $add_note_message);
 
-  // Inserts remove message.
-  $add_note_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been added and saved.') . '</div></div>';
-  $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $add_note_message);
+    // Returns textarea for adding notes with red border indicates that an error has occurred.
+    $ajax_commands[] = ajax_command_replace('#textarea_' . $field_name, drupal_render($form[$field_name][LANGUAGE_NONE][0]['note']));
+  }
+  else {
+    // Adds note entity to the database.
+    editor_note_save($note, $entity_type, $entity, $field_name);
 
-  // Updates notes table and pager.
-  $field = field_info_field($field_name);
-  $notes = editor_note_get_notes($entity_type, $entity, $field);
-  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
-  $ajax_commands[] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+    // Inserts remove message.
+    $add_note_message = '<div id="status_message_' . $field_name . '"><div class="messages status">' . t('Note has been added and saved.') . '</div></div>';
+    $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $add_note_message);
+
+    // Updates notes table and pager.
+    $field = field_info_field($field_name);
+    $notes = editor_note_get_notes($entity_type, $entity, $field);
+    $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+    $ajax_commands[] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+
+    // Returns blank textarea for adding notes.
+    $form[$field_name][LANGUAGE_NONE][0]['note']['#default_value'] = '';
+    $ajax_commands[] = ajax_command_replace('#textarea_' . $field_name, drupal_render($form[$field_name][LANGUAGE_NONE][0]['note']));
+  }
 
   return array(
     '#type' => 'ajax',
@@ -1152,12 +1205,26 @@ function editor_note_add_note(&$form, &$form_state) {
 }
 
 /**
+ * Validate callback for 'editor_note_field_widget_form'.
+ *
+ * @param $form
+ * @param $form_state
+ */
+function editor_note_add_note_validate(&$form, &$form_state) {
+  $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
+  $field_info = field_info_instance($form['#entity_type'], $field_name, $form['#bundle']);
+  if (empty($form_state['values'][$field_name][LANGUAGE_NONE][0]['note'])) {
+    form_set_error($field_name, t('Field %field_name is required.', array('%field_name' => $field_info['label'])));
+  }
+}
+
+/**
  * Submit callback for 'editor_note_field_widget_form'.
  *
  * @param $form
  * @param $form_state
  */
-function editor_note_ajax_submit(&$form, &$form_state) {
+function editor_note_add_note_submit(&$form, &$form_state) {
   $form_state['rebuild'] = TRUE;
 }
 
