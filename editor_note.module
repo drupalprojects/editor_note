@@ -1170,6 +1170,7 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   // Updates note entity in the database.
   $note = editor_note_load($note_id);
   $note->note = $form_state['values']['note'];
+  $note->changed = REQUEST_TIME;
   $note->save();
 
   // Closes the modal.
@@ -1339,17 +1340,17 @@ function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
 /**
  * Enables support of CTools module for Ajax operations.
  *
- * @param $field_name
+ * @param string $field_name
  */
 function editor_note_add_ctools_support($field_name) {
-  // Include the CTools tools that we need.
+  // Includes the CTools tools that we need.
   ctools_include('ajax');
   ctools_include('modal');
 
-  // Add CTools' javascript to the page.
+  // Adds CTools' javascript to the page.
   ctools_modal_add_js();
 
-  // Create our own javascript settings that will be used to theme a modal.
+  // Creates our own javascript settings that will be used to theme a modal.
   $modal_styles = array(
     $field_name . '-remove' => array(
       'modalSize' => array(
@@ -1377,9 +1378,9 @@ function editor_note_add_ctools_support($field_name) {
     ),
   );
 
-  // Pass CTools modal settings to js.
+  // Passes CTools modal settings to js.
   drupal_add_js($modal_styles, 'setting');
 
-  // Add custom css to style popups.
+  // Adds custom css to style popups.
   ctools_add_css('editor-note-ctools-style', 'editor_note');
 }
