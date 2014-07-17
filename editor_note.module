@@ -16,6 +16,9 @@
  * @todo remove notes on entity delete.
  * @todo test with other types of entities.
  * @todo check if field is available in $entity object.
+ * @todo how to distinguish 2 pagers on the page, 2 pagers - if one field should have pager and another should not - pagers anyway show up, see str
+ * @todo after ajax refresh table shows up on the first page even if we were on the last page before it. See condition on the str 905, @see $field['settings']['pager']['enabled'].
+ * @todo move these settings to the field settings form in the future.
  */
 
 /**
@@ -294,8 +297,9 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
  */
 function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
-    // Update cardinality field.
-    // @todo think again about cardinality - better 1 and create custom field for it? Because element with delta 1 is not used at all.
+    // @todo to think and discuss: better set 1 and create custom field for it?
+    // @todo because element with delta > 0 is not used at all.
+    // Modifies cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
       drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
     $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
@@ -315,7 +319,8 @@ function editor_note_field_widget_info() {
       'field types' => array('editor_note'),
       'settings' => array(),
       'behaviors' => array(
-        'multiple values' => FIELD_BEHAVIOR_DEFAULT, // @todo implement that user can create 2 (? 3) or more fields.
+        // @todo implement check if user is able to create multiple fields.
+        'multiple values' => FIELD_BEHAVIOR_DEFAULT,
         'default value' => FIELD_BEHAVIOR_DEFAULT,
       ),
     ),
@@ -360,6 +365,11 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
           'callback' => 'editor_note_add_note',
           'event' => 'click',
         ),
+      );
+
+      $element['note_entity_id'] = array(
+        '#type' => 'value',
+        '#value' => $entity_id,
       );
 
       if (isset($form_state['triggering_element']['#name']) &&
@@ -792,10 +802,11 @@ function editor_note_get_notes($entity_type, $entity, $field) {
  * @param array $field
  * @param array $notes
  * @param bool $widget
+ * @param string|null $edit_path
  *
  * @return array
  */
-function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
+function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_path = NULL) {
   $formatted_notes = array(
     '#prefix' => '<div id="formatted_notes_' . $field['field_name'] . '">',
     '#suffix' => '</div>',
@@ -815,12 +826,12 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
         'class' => array('field-author'),
       ),
       array(
-        'data' => t('Created'),
-        'class' => array('field-created'),
-      ),
-      array(
         'data' => t('Changed'),
         'class' => array('field-changed'),
+      ),
+      array(
+        'data' => t('Created'),
+        'class' => array('field-created'),
       ),
     );
 
@@ -834,6 +845,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
     }
 
     foreach ($notes as $note_id => $item) {
+      $author_name = format_username(user_load($item->uid));
       $rows[$counter] = array(
         'data' => array(
           'note' => array(
@@ -841,9 +853,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
             'class' => array('note'),
           ),
           'author' => array(
-            'data' => user_access('access user profiles') ?
-                l(format_username(user_load($item->uid)), 'user/' . $item->uid) :
-                format_username(user_load($item->uid)),
+            'data' => user_access('access user profiles') ? l($author_name, 'user/' . $item->uid) : $author_name,
             'class' => array('author'),
           ),
           'changed' => array(
@@ -863,26 +873,17 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
           'item_list',
           array(
             'items' => array(
-              ctools_modal_text_button(t('edit'), 'editor_note/edit/nojs/' . $note_id, t('Edit the note'),  'ctools-modal-' . $field['field_name'] . '-edit'),
-              ctools_modal_text_button(t('remove'), 'editor_note/remove/nojs/' . $note_id, t('Remove the note'),  'ctools-modal-' . $field['field_name'] . '-remove'),
-//              l(
-//                t('edit'),
-//                'editor_note/edit/nojs/' . $note_id,
-//                array(
-//                  'attributes' => array(
-//                    'class' => array('ctools-use-modal', 'ctools-modal-' . 'ctools-' . $field['field_name'] . '-remove'),
-//                  ),
-//                )
-//              ),
-//              l(
-//                t('remove'),
-//                'editor_note/remove/nojs/' . $note_id,
-//                array(
-//                  'attributes' => array(
-//                    'class' => array('ctools-use-modal', 'ctools-modal-' . 'ctools-' . $field['field_name'] . '-edit'),
-//                  ),
-//                )
-//              )
+              ctools_modal_text_button(
+                t('edit'),
+                'editor_note/edit/nojs/' . $note_id,
+                t('Edit the note'),
+                'ctools-modal-' . $field['field_name'] . '-edit'
+              ),
+              ctools_modal_text_button(
+                t('remove'),
+                'editor_note/remove/nojs/' . $note_id,
+                t('Remove the note'),
+                'ctools-modal-' . $field['field_name'] . '-remove'),
             ),
           )
         );
@@ -903,16 +904,24 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE) {
       )
     );
 
-    // @todo check pager which gets broken after ajax refresh.
-    // @todo how to distinguish 2 pagers on the page.
-    // @todo pager disappears on the last page.
-    if ($field['settings']['pager']['enabled'] && count($notes) == $field['settings']['limit']) {
+    if ($field['settings']['pager']['enabled']) {
+      // Fixes pager on ajax refresh. Otherwise pager links point on /system/ajax after ajax refresh.
+      // @see https://www.drupal.org/node/1181370#comment-6088864 for more details.
+      // @see theme_pager_link().
+      if ($edit_path) {
+        $_GET['q'] = $edit_path;
+      }
+
       if ($field['settings']['pager']['pager_below']) {
         $formatted_notes['notes_table'] = $notes_table;
-        $formatted_notes['notes_table_pager'] = array('#theme' => 'pager');
+        $formatted_notes['notes_table_pager'] = array(
+          '#theme' => 'pager',
+        );
       }
       else {
-        $formatted_notes['notes_table_pager'] = array('#theme' => 'pager');
+        $formatted_notes['notes_table_pager'] = array(
+          '#theme' => 'pager',
+        );
         $formatted_notes['notes_table'] = $notes_table;
       }
     }
@@ -1051,6 +1060,7 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   $entity_type = $form_state['values']['note_entity_type'];
   $entity_id = $form_state['values']['note_entity_id'];
   $note_id = $form_state['values']['note_entity_id'];
+  $edit_path = implode('/', array($entity_type, $entity_id, 'edit'));
 
   // Removes note entity from the database.
   editor_note_delete($form_state['values']['note_id']);
@@ -1067,7 +1077,7 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   $entity_array = entity_load($entity_type, array($entity_id));
   $entity = $entity_array[$note_id];
   $notes = editor_note_get_notes($entity_type, $entity, $field);
-  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
   $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
 }
 
@@ -1166,6 +1176,7 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $entity_id = $form_state['values']['note_entity_id'];
   $note_id = $form_state['values']['note_id'];
   $field = field_info_field($field_name);
+  $edit_path = implode('/', array($entity_type, $entity_id, 'edit'));
 
   // Updates note entity in the database.
   $note = editor_note_load($note_id);
@@ -1184,7 +1195,7 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $entity_array = entity_load($entity_type, array($entity_id));
   $entity = $entity_array[$entity_id];
   $notes = editor_note_get_notes($entity_type, $entity, $field);
-  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
   $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
 }
 
@@ -1202,6 +1213,8 @@ function editor_note_add_note(&$form, &$form_state) {
   $entity = $form['#entity'];
   $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
   $note = $form_state['values'][$field_name][LANGUAGE_NONE][0]['note'];
+  $entity_id = $form_state['values'][$field_name][LANGUAGE_NONE][0]['note_entity_id'];
+  $edit_path = implode('/', array($entity_type, $entity_id, 'edit'));
   $errors = form_get_errors();
 
   if (!empty($errors) && isset($errors[$field_name])) {
@@ -1223,7 +1236,7 @@ function editor_note_add_note(&$form, &$form_state) {
     // Updates notes table and pager.
     $field = field_info_field($field_name);
     $notes = editor_note_get_notes($entity_type, $entity, $field);
-    $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+    $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
     $ajax_commands[] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
 
     // Returns blank textarea for adding notes.
@@ -1350,7 +1363,7 @@ function editor_note_add_ctools_support($field_name) {
   // Adds CTools' javascript to the page.
   ctools_modal_add_js();
 
-  // Creates our own javascript settings that will be used to theme a modal.
+  // Creates javascript settings to customize modal.
   $modal_styles = array(
     $field_name . '-remove' => array(
       'modalSize' => array(
