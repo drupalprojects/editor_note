@@ -6,20 +6,19 @@
  */
 
 /**
- * @todo check on /node/add/ - should not be possible to add notes via ajax on empty node
- * @todo check field permissions - https://www.drupal.org/project/field_permissions
- * @todo test with multiple languages
- * @todo test with revisions
- * @todo add detailed README.txt and hook_help
- * @todo add wysiwyg/filtered text support in the future
- * @todo think about CRUD permissions on editor note entity.
- * @todo remove notes on entity delete.
- * @todo test with other types of entities.
- * @todo check if field is available in $entity object.
- * @todo how to distinguish 2 pagers on the page, 2 pagers - if one field should have pager and another should not - pagers anyway show up, see str
- * @todo after ajax refresh table shows up on the first page even if we were on the last page before it. See condition on the str 905, @see $field['settings']['pager']['enabled'].
+ * @todo make cardinality hidden and 1 by default (because element with delta > 0 is not used at all), implement alternative setting.
+ *  There can be problems with editor_note_theme_field_multiple_value_form in this case. @see https://api.drupal.org/api/drupal/modules%21field%21field.api.php/function/hook_field_widget_info/7
+ * @todo test with multiple languages, add lang column (think also about format column)
+ * @todo think about CRUD permissions on editor note entity, check field permissions - https://www.drupal.org/project/field_permissions
+ * @todo check for views support.
+ * @todo how to distinguish 2 pagers on the page, 2 pagers - if one field should have pager and another should not - pagers anyway show up
+ *
  * @todo move Ctools settings to the field settings form in the future.
+ * @todo add wysiwyg/filtered text support in the future, add 'format' column
+ * @todo add detailed README.txt and hook_help
+ *
  * @todo implement hooks and think about .api.php file.
+ * @todo special page to browse all notes? Maybe views table with exposed filters as feature-based submodule?.
  */
 
 /**
@@ -144,8 +143,8 @@ function editor_note_entity_property_info() {
     ),
     'uid' => array(
       'type'  => 'integer',
-      'label' => t('Author UID'),
-      'description' => t('The unique ID of the user who authored editor note.'),
+      'label' => t('Updated by UID'),
+      'description' => t('The unique ID of the user who last updated editor note.'),
       'schema field' => 'uid',
     ),
     'created' => array(
@@ -165,6 +164,30 @@ function editor_note_entity_property_info() {
   $info['note']['properties'] = $properties;
 
   return $info;
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function editor_note_entity_delete($entity, $type) {
+  list($entity_id) = entity_extract_ids($type, $entity);
+  // Removes notes from editor notes table.
+  db_delete('editor_note')
+    ->condition('entity_type', $type)
+    ->condition('entity_id', $entity_id)
+    ->execute();
+}
+
+/**
+ * Implements hook_node_revision_delete().
+ */
+function editor_note_node_revision_delete($node) {
+  // Removes notes from editor notes table.
+  db_delete('editor_note')
+    ->condition('entity_type', 'node')
+    ->condition('entity_id', $node->nid)
+    ->condition('revision_id', $node->vid)
+    ->execute();
 }
 
 /**
@@ -308,8 +331,6 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
  */
 function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
-    // @todo to think and discuss: better set 1 and create custom field for it?
-    // @todo because element with delta > 0 is not used at all.
     // Modifies cardinality field.
     $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
       drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
@@ -583,6 +604,24 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
 }
 
 /**
+ * Implements hook_field_load().
+ *
+ * Defines custom load behavior for the field properties available in entity object.
+ */
+function editor_note_field_load($entity_type, $entities, $field, $instances, $langcode, &$items, $age) {
+  if ($field['type'] == 'editor_note') {
+    foreach ($entities as $id => $entity) {
+      $delta = 0;
+      $notes = editor_note_get_notes($entity_type, $entity, $field, TRUE);
+      foreach ($notes as $note_id) {
+        $items[$id][$delta]['editor_note_id'] = $note_id;
+        $delta++;
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_field_formatter_view().
  *
  * Builds registered formatters for the field, returns renderable array.
@@ -592,7 +631,7 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
   $display['field_name'] = $field['field_name'];
   if ($display['type'] == 'editor_note_field_formatter') {
     $notes = editor_note_get_notes($entity_type, $entity, $display);
-    $element[0][$field['field_name']] = editor_note_get_formatted_notes($display, $notes);
+    $element[][$field['field_name']] = editor_note_get_formatted_notes($display, $notes);
   }
 
   return $element;
@@ -781,21 +820,27 @@ function editor_note_delete_multiple($note_ids) {
  * @param string $entity_type
  * @param object $entity
  * @param array $field
+ * @param bool $id_only returns array of note ids instead of fully loaded notes.
  *
  * @return mixed
  */
-function editor_note_get_notes($entity_type, $entity, $field) {
+function editor_note_get_notes($entity_type, $entity, $field, $id_only = FALSE) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
-  $query = db_select('editor_note', 'en');
+  if (!isset($revision_id)) {
+    $revision_id = $entity_id;
+  }
 
-  if ($field['settings']['limit'] > 0) {
-    if ($field['settings']['pager']['enabled']) {
-      $query = $query->extend('PagerDefault');
-      $query->limit($field['settings']['limit']);
-    }
-    else {
-      $query->range(0, $field['settings']['limit']);
-    }
+  $query = db_select('editor_note', 'en');
+  $query->condition('en.entity_type', $entity_type, '=')
+    ->condition('en.entity_id', $entity_id, '=')
+    ->condition('en.bundle', $bundle, '=')
+    ->condition('en.revision_id', $revision_id, '=')
+    ->condition('en.field_name', $field['field_name'], '=')
+    ->orderBy('en.changed', $field['settings']['order']);
+
+  if ($id_only) {
+    $ids = $query->fields('en', array('id'))->execute()->fetchAllKeyed(0, 0);
+    return array_values($ids);
   }
 
   $columns = array(
@@ -811,17 +856,19 @@ function editor_note_get_notes($entity_type, $entity, $field) {
     'changed',
   );
 
-  $query->fields('en', $columns)
-    ->condition('en.entity_type', $entity_type, '=')
-    ->condition('en.entity_id', $entity_id, '=')
-    ->condition('en.bundle', $bundle, '=')
-    ->condition('en.revision_id', $revision_id, '=')
-    ->condition('en.field_name', $field['field_name'], '=')
-    ->orderBy('en.changed', $field['settings']['order']);
+  $query->fields('en', $columns);
 
-  $notes = $query->execute()->fetchAllAssoc('id');
+  if ($field['settings']['limit'] > 0) {
+    if ($field['settings']['pager']['enabled']) {
+      $query = $query->extend('PagerDefault');
+      $query->limit($field['settings']['limit']);
+    }
+    else {
+      $query->range(0, $field['settings']['limit']);
+    }
+  }
 
-  return $notes;
+  return $query->execute()->fetchAllAssoc('id');
 }
 
 /**
@@ -850,7 +897,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
         'class' => array('field-label'),
       ),
       array(
-        'data' => t('Author'),
+        'data' => t('Updated by'),
         'class' => array('field-author'),
       ),
       array(
@@ -1211,6 +1258,7 @@ function editor_note_confirm_edit_form($form, $form_state, $id) {
  * @param array $form_state
  */
 function editor_note_confirm_edit_form_update(&$form, &$form_state) {
+  global $user;
   $field_name = $form_state['values']['note_field_name'];
   $entity_type = $form_state['values']['note_entity_type'];
   $entity_id = $form_state['values']['note_entity_id'];
@@ -1222,6 +1270,7 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $note = editor_note_load($note_id);
   $note->note = $form_state['values']['note'];
   $note->changed = REQUEST_TIME;
+  $note->uid = $user->uid;
   $note->save();
 
   // Closes the modal.
