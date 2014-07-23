@@ -76,8 +76,9 @@ function editor_note_schema() {
     ),
     'primary key' => array('id'),
     'indexes' => array(
-      'editor_note_nid' => array('id'),
+      'editor_note_id' => array('id'),
       'editor_note_uid' => array('uid'),
+      'editor_note_changed' => array('changed'),
       'editor_note_created' => array('created'),
     ),
   );
