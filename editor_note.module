@@ -6,11 +6,10 @@
  */
 
 /**
+ * @todo field doesn't cleans up when removing field from bundle. Test how default fields work in that case. Special conformation form should be added, its submit callback will remove the data.
  * @todo make cardinality hidden and 1 by default (because element with delta > 0 is not used at all), implement alternative setting.
  *  There can be problems with editor_note_theme_field_multiple_value_form in this case. @see https://api.drupal.org/api/drupal/modules%21field%21field.api.php/function/hook_field_widget_info/7
- * @todo test with multiple languages, add lang column (think also about format column)
  * @todo think about CRUD permissions on editor note entity, check field permissions - https://www.drupal.org/project/field_permissions
- * @todo check for views support.
  * @todo how to distinguish 2 pagers on the page, 2 pagers - if one field should have pager and another should not - pagers anyway show up
  *
  * @todo add wysiwyg/filtered text support in the future, add 'format' column
@@ -18,7 +17,6 @@
  * @todo if .module file is too large break it down into several smaller files.
  *
  * @todo implement hooks and think about .api.php file.
- * @todo special page to browse all notes? Maybe views table with exposed filters as feature-based submodule?.
  */
 
 /**
@@ -83,7 +81,9 @@ function editor_note_entity_info() {
       'label' => t('Editor Note'),
       'entity class' => 'Entity',
       'controller class' => 'EntityAPIController',
+      'views controller class' => 'EntityDefaultViewsController',
       'base table' => 'editor_note',
+      'fieldable' => FALSE,
       'entity keys' => array(
         'id' => 'id',
       ),
@@ -130,13 +130,13 @@ function editor_note_entity_property_info() {
       'schema field' => 'field_name',
     ),
     'entity_id' => array(
-      'type' => 'int',
+      'type' => 'integer',
       'label' => t('Entity ID'),
       'description' => 'The entity id editor note is attached to.',
-      'schema field' => 'entity_type',
+      'schema field' => 'entity_id',
     ),
     'revision_id' => array(
-      'type' => 'int',
+      'type' => 'integer',
       'label' => t('Revision ID'),
       'description' => 'The entity revision editor note is attached to.',
       'schema field' => 'revision_id',
@@ -148,22 +148,54 @@ function editor_note_entity_property_info() {
       'schema field' => 'uid',
     ),
     'created' => array(
-      'type' => 'int',
+      'type' => 'date',
       'label' => t('Created'),
-      'description' => 'The time that the note was created.',
+      'description' => 'The timestamp that the note was created.',
       'schema field' => 'created',
     ),
     'changed' => array(
-      'type' => 'int',
+      'type' => 'date',
       'label' => t('Changed'),
-      'description' => 'The time that the note was last edited.',
+      'description' => 'The timestamp that the note was last updated.',
       'schema field' => 'changed',
     ),
   );
 
-  $info['note']['properties'] = $properties;
+  $info['editor_note']['properties'] = $properties;
 
   return $info;
+}
+
+
+/**
+ * Implements hook_views_data_alter().
+ */
+function editor_note_views_data_alter(&$data) {
+  // Exposes uid as a relationship to users.
+  $data['editor_note']['author_info'] = array(
+    'title' => t('User information.'),
+    'help' => t('Information related to user who authored/updated the note.'),
+    'relationship' => array(
+      'base' => 'users',
+      'base field' => 'uid',
+      'relationship field' => 'uid',
+      'handler' => 'views_handler_relationship',
+      'label' => t('User information.'),
+    ),
+  );
+
+  // Expose entity_id as a relationship to node (the most common use case).
+  $data['editor_note']['node_info'] = array(
+    'title' => t('Node information.'),
+    'help' => t('Related node object.'),
+    'relationship' => array(
+      'base' => 'node',
+      'base field' => 'nid',
+      'relationship field' => 'entity_id',
+      'handler' => 'views_handler_relationship',
+      'label' => t('Node information.'),
+    ),
+  );
 }
 
 /**
@@ -187,6 +219,20 @@ function editor_note_node_revision_delete($node) {
     ->condition('entity_type', 'node')
     ->condition('entity_id', $node->nid)
     ->condition('revision_id', $node->vid)
+    ->execute();
+}
+
+/**
+ * Implements hook_field_delete().
+ */
+function editor_note_field_delete($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  $ids = entity_extract_ids($entity_type, $entity);
+  $bundle = $ids[2];
+  // Removes notes from editor notes table.
+  db_delete('editor_note')
+    ->condition('entity_type', $entity_type)
+    ->condition('bundle', $bundle)
+    ->condition('field_name', $field['field_name'])
     ->execute();
 }
 
