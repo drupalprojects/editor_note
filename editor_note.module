@@ -73,6 +73,21 @@ function editor_note_permission() {
 }
 
 /**
+ * Implements hook_theme().
+ */
+function editor_note_theme() {
+  return array(
+    'editor_note_message' => array(
+      'variables' => array(
+        'field_name' => NULL,
+        'message_text' => NULL,
+        'message_type' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
  * Implements hook_entity_info().
  */
 function editor_note_entity_info() {
@@ -1319,7 +1334,8 @@ function editor_note_confirm_form_cancel(&$form, &$form_state) {
   $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
   // Removes previous status message.
-  $message = editor_note_format_message($field_name);
+  $message = theme('editor_note_message', array('field_name' => $field_name));
+
   $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
 }
 
@@ -1343,7 +1359,15 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
   // Displays remove message.
-  $message = editor_note_format_message($field_name, t('Note has been removed.'), 'status');
+  $message = theme(
+    'editor_note_message',
+    array(
+      'field_name' => $field_name,
+      'message_text' => t('Note has been removed.'),
+      'message_type' => 'status',
+    )
+  );
+
   $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
 
   // Updates notes table and pager.
@@ -1464,7 +1488,15 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
   // Displays remove message.
-  $message = editor_note_format_message($field_name, t('Note has been updated and saved.'), 'status');
+  $message = theme(
+    'editor_note_message',
+    array(
+      'field_name' => $field_name,
+      'message_text' => t('Note has been updated and saved.'),
+      'message_type' => 'status',
+    )
+  );
+
   $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
 
   // Updates notes table and pager.
@@ -1495,7 +1527,15 @@ function editor_note_add_note(&$form, &$form_state) {
 
   if (!empty($errors) && isset($errors[$field_name])) {
     // Displays validation message.
-    $message = editor_note_format_message($field_name, $errors[$field_name], 'error');
+    $message = theme(
+      'editor_note_message',
+      array(
+        'field_name' => $field_name,
+        'message_text' => t($errors[$field_name]),
+        'message_type' => 'error',
+      )
+    );
+
     $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $message);
 
     // Returns textarea for adding notes with red border indicates that an error has occurred.
@@ -1506,7 +1546,15 @@ function editor_note_add_note(&$form, &$form_state) {
     editor_note_save($note, $entity_type, $entity, $field_name);
 
     // Displays status message.
-    $message = editor_note_format_message($field_name, t('Note has been added and saved.'), 'status');
+    $message = theme(
+      'editor_note_message',
+      array(
+        'field_name' => $field_name,
+        'message_text' => t('Note has been added and saved.'),
+        'message_type' => 'status',
+      )
+    );
+
     $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $message);
 
     // Updates notes table and pager.
@@ -1681,13 +1729,15 @@ function editor_note_load_ctools_modal($field) {
 /**
  * Returns formatted status message for Ajax-triggered actions.
  *
- * @param $field_name
- * @param string $message_text
- * @param string $message_type
+ * @param array $variables
  *
  * @return string
  */
-function editor_note_format_message($field_name, $message_text = '', $message_type = '') {
+function theme_editor_note_message($variables) {
+  $field_name = $variables['field_name'];
+  $message_text = $variables['message_text'];
+  $message_type = $variables['message_type'];
+
   if (!empty($message_text) && !empty($message_type)) {
     return '<div id="status_message_' . $field_name . '">
     <div class="messages ' . $message_type . '">' . $message_text . '</div></div>';
