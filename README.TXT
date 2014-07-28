@@ -1,12 +1,12 @@
 
-ABOUT
+About
 =====
 
 Project for Drupal 7.
-The modules improves Administration/Editorial Usability and provides
+The modules improves administration/editorial usability and provides
 configurable "Editor Notes" field, which can be added to any Drupal entity.
 
-USE CASE
+Use case
 ========
 
 * As website editor I can write status notes to myself and other editors working
@@ -15,33 +15,33 @@ USE CASE
 * This field can also be added to any Drupal fieldable entity (user etc).
 * List of previously added notes displays in 'content edit' form in configurable
   table.
-* It can also be displayed for the end user if necessary.
+* Notes can also be displayed for the end user in configurable table if necessary.
 
-FEATURES
+Features
 ========
 
-* Website editor can only update / delete his own notes by default.
+* Website editor can only add / update / delete his own notes by default.
 * However notes may also be updated or removed by any user with
   "Administer any editor note" permission.
 * CRUD operations on notes support Ajax and perform in configurable modal window
   without page reload.
 * Module supports Views, content revisions and content translation.
 
-REQUIREMENTS
+Requirements
 ============
 
 Chaos tool suite (https://www.drupal.org/project/ctools)
 Entity API (https://www.drupal.org/project/entity)
 
-INSTALLATION
+Installation
 ============
 
-1. Drop the entire Editor Note module into your 'sites/all/modules' folder
-2. Enable the module from the Administration area modules page (admin/build/modules)
-3. Create or Edit a content-type and add a new field of type 'Editor Notes'
-  (admin/structure/types in D7)
+1. Drop the entire Editor Note module into your 'sites/all/modules' folder.
+2. Enable the module from the Administration area modules page (admin/modules).
+3. Create new or edit existing content type and add a new field of type
+   'Editor Notes' (admin/structure/types in D7).
 
-CREDITS
+Credit
 ============
 
 This project was sponsored by:
@@ -52,7 +52,7 @@ This project was sponsored by:
 Many thanks to Sergei Churilo (https://www.drupal.org/user/584658)
 and Alexey Yahnenko (https://www.drupal.org/user/2635711) for reviewing the module.
 
-AUTHOR
+Author
 ======
 
 Rostislav Sergeenkov (https://www.drupal.org/u/rostislav-sergeenkov)

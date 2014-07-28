@@ -10,7 +10,6 @@
  * @todo hide/show textarea and button depending on notes count and cardinality setting (@see editor_note_add_note(), editor_note_confirm_remove_form_remove()).
  *
  * @todo add wysiwyg/filtered text support in the future, add 'format' column in schema.
- * @todo add hook_help.
  *
  * @todo implement hooks and think about .api.php file.
  */
@@ -18,17 +17,63 @@
 /**
  * Implements hook_help().
  */
-/**
- * Implements hook_help().
- */
 function editor_note_help($path, $arg) {
   if ($path == 'admin/help#editor_note') {
-    $readme_path = drupal_get_path('module', 'editor_note') . '/README.txt';
-    $readme_request = drupal_http_request(url($readme_path, array('absolute' => TRUE)));
-    if (isset($readme_request->data) && !isset($readme_request->error)) {
-      // Returns a line-break version of the module README.txt.
-      return _filter_autop($readme_request->data);
-    }
+    $output = '<h3>' . t('About') . '</h3>';
+    $output .= '<p>' . t('The modules improves administration/editorial usability and provides configurable "Editor Notes" field,
+    which can be added to any Drupal entity.') . '</p>';
+
+    $output .= '<h3>' . t('Use case') . '</h3>';
+    $use_case = array(
+      t('As website editor I can write status notes to myself and other editors working on the same material.'),
+      t('The module provides "Editor Notes" field available on "Manage Fields" page.'),
+      t('This field can also be added to any Drupal fieldable entity (user etc).'),
+      t('List of previously added notes displays in "content edit" form in configurable table.'),
+      t('Notes can also be displayed for the end user in configurable table if necessary.'),
+    );
+    $output .= theme('item_list', array('items' => $use_case));
+
+    $output .= '<h3>' . t('Features') . '</h3>';
+    $features = array(
+      t('Website editor can only add / update / delete his own notes by default.'),
+      t('However notes may also be updated or removed by any user with "Administer any editor note" permission.'),
+      t('CRUD operations on notes support Ajax and perform in configurable modal window without page reload.'),
+      t('Module supports Views, content revisions and content translation.'),
+    );
+    $output .= theme('item_list', array('items' => $features));
+
+    $output .= '<h3>' . t('Requirements') . '</h3>';
+    $requirements = array(
+      l(t('Chaos tool suite'), 'https://www.drupal.org/project/ctools'),
+      l(t('Entity API'), 'https://www.drupal.org/project/entity'),
+    );
+    $output .= theme('item_list', array('items' => $requirements));
+
+    $output .= '<h3>' . t('Installation') . '</h3>';
+    $installation = array(
+      t('Drop the entire Editor Note module into your "sites/all/modules" folder.'),
+      t('Enable the module from the !page.', array('!page' => l('modules page', 'admin/modules'))),
+      t('Create new or edit existing content type and add a new field of type "Editor Notes".'),
+    );
+    $output .= theme('item_list', array('items' => $installation, 'type' => 'ol'));
+
+    $output .= '<h3>' . t('Credit') . '</h3>';
+    $credit = array(
+      l('EPAM Systems', 'https://www.drupal.org/node/2114867'),
+      l('NBC Universal', 'http://www.nbcuni.com'),
+    );
+    $output .= '<p>' . t('This project was sponsored by') . ':</p>';
+    $output .= theme('item_list', array('items' => $credit));
+    $output .= '<p>' . t('Many thanks to !username1 and !username2 for reviewing the module.',
+      array(
+        '!username1' => l('Sergei Churilo', 'https://www.drupal.org/user/584658'),
+        '!username2' => l('Alexey Yahnenko', 'https://www.drupal.org/user/2635711'))
+      ) . '</p>';
+
+    $output .= '<h3>' . t('Author') . '</h3>';
+    $output .= '<p>' . l('Rostislav Sergeenkov', 'https://www.drupal.org/u/rostislav-sergeenkov') . '</p>';
+
+    return $output;
   }
 }
 
