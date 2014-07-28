@@ -9,10 +9,9 @@
  * @todo field doesn't cleans up when removing field from bundle. Test how default fields work in that case. Special conformation form should be added, its submit callback will remove the data.
  * @todo make cardinality hidden and 1 by default (because element with delta > 0 is not used at all), implement alternative setting.
  *  There can be problems with editor_note_theme_field_multiple_value_form in this case. @see https://api.drupal.org/api/drupal/modules%21field%21field.api.php/function/hook_field_widget_info/7
- * @todo think about CRUD permissions on editor note entity, check field permissions - https://www.drupal.org/project/field_permissions
- * @todo how to distinguish 2 pagers on the page, 2 pagers - if one field should have pager and another should not - pagers anyway show up
  *
- * @todo add wysiwyg/filtered text support in the future, add 'format' column
+ * @todo Update note: 'size' => 'normal' (16 KB) and test with bigger text.
+ * @todo add wysiwyg/filtered text support in the future, add 'format' column in schema.
  * @todo add hook_help.
  *
  * @todo implement hooks and think about .api.php file.
@@ -235,20 +234,6 @@ function editor_note_node_revision_delete($node) {
     ->condition('entity_type', 'node')
     ->condition('entity_id', $node->nid)
     ->condition('revision_id', $node->vid)
-    ->execute();
-}
-
-/**
- * Implements hook_field_delete().
- */
-function editor_note_field_delete($entity_type, $entity, $field, $instance, $langcode, &$items) {
-  $ids = entity_extract_ids($entity_type, $entity);
-  $bundle = $ids[2];
-  // Removes notes from editor notes table.
-  db_delete('editor_note')
-    ->condition('entity_type', $entity_type)
-    ->condition('bundle', $bundle)
-    ->condition('field_name', $field['field_name'])
     ->execute();
 }
 
@@ -692,8 +677,8 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
       '#type' => 'radios',
       '#title' => t('Order Notes'),
       '#options' => array(
-        'DESC' => t('Display new notes first'),
-        'ASC' => t('Display old notes first'),
+        'DESC' => t('display recently updated notes first'),
+        'ASC' => t('display recently updated notes last'),
       ),
       '#default_value' => $settings['order'],
       '#description' => t('Set order of notes in the table.'),
@@ -753,7 +738,7 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
   if ($display['type'] == 'editor_note_field_formatter') {
     $summary[] = t('Display a specified number of items') . ': ' . $display['settings']['limit'];
     $summary[] = t('Notes Ordering') . ': ' .
-      ($settings['order'] == 'DESC' ? t('display new notes first') : t('display old notes first'));
+      ($settings['order'] == 'DESC' ? t('display recently updated notes first') : t('display recently updated notes last'));
     if ($display['settings']['limit'] > 0) {
       $summary[] = t('Enable pagination') . ': ' . ($settings['pager']['enabled'] ? 'true' : 'false');
       $summary[] = t('Pagination below notes table') . ': ' .
@@ -1142,6 +1127,10 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
     );
 
     if ($field['settings']['pager']['enabled']) {
+      // An optional integer to distinguish between multiple pagers on one page
+      // in case if 2 fields are present at the same time.
+      static $page_element = 0;
+
       // Fixes pager on ajax refresh. Otherwise pager links point on /system/ajax after ajax refresh.
       // @see https://www.drupal.org/node/1181370#comment-6088864 for more details.
       // @see theme_pager_link().
@@ -1153,11 +1142,13 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
         $formatted_notes['notes_table'] = $notes_table;
         $formatted_notes['notes_table_pager'] = array(
           '#theme' => 'pager',
+          '#element' => $page_element,
         );
       }
       else {
         $formatted_notes['notes_table_pager'] = array(
           '#theme' => 'pager',
+          '#element' => $page_element,
         );
         $formatted_notes['notes_table'] = $notes_table;
       }
@@ -1170,6 +1161,8 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
         $formatted_notes['notes_table']['#attached']['js'][] = array('data' => $settings, 'type' => 'setting');
         $formatted_notes['notes_table']['#attached']['js'][] = drupal_get_path('module', 'editor_note') . '/js/editor_note.js';
       }
+
+      $page_element++;
     }
     else {
       $formatted_notes['notes_table'] = $notes_table;
