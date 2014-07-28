@@ -6,11 +6,9 @@
  */
 
 /**
- * @todo field doesn't cleans up when removing field from bundle. Test how default fields work in that case. Special conformation form should be added, its submit callback will remove the data.
- * @todo make cardinality hidden and 1 by default (because element with delta > 0 is not used at all), implement alternative setting.
- *  There can be problems with editor_note_theme_field_multiple_value_form in this case. @see https://api.drupal.org/api/drupal/modules%21field%21field.api.php/function/hook_field_widget_info/7
+ * @todo cardinality should be 1, instead it will be 10, 50, 100 or more empty items in $form_state['values'].
+ * @todo hide/show textarea and button depending on notes count and cardinality setting (@see editor_note_add_note(), editor_note_confirm_remove_form_remove()).
  *
- * @todo Update note: 'size' => 'normal' (16 KB) and test with bigger text.
  * @todo add wysiwyg/filtered text support in the future, add 'format' column in schema.
  * @todo add hook_help.
  *
@@ -234,6 +232,18 @@ function editor_note_node_revision_delete($node) {
     ->condition('entity_type', 'node')
     ->condition('entity_id', $node->nid)
     ->condition('revision_id', $node->vid)
+    ->execute();
+}
+
+/**
+ * Implements hook_field_delete_instance().
+ */
+function editor_note_field_delete_instance($instance) {
+  // Removes notes from editor notes table.
+  db_delete('editor_note')
+    ->condition('entity_type', $instance['entity_type'])
+    ->condition('bundle', $instance['bundle'])
+    ->condition('field_name', $instance['field_name'])
     ->execute();
 }
 
@@ -498,7 +508,6 @@ function editor_note_field_widget_info() {
       'field types' => array('editor_note'),
       'settings' => array(),
       'behaviors' => array(
-        // @todo check if user is able to create multiple fields.
         'multiple values' => FIELD_BEHAVIOR_DEFAULT,
         'default value' => FIELD_BEHAVIOR_DEFAULT,
       ),
@@ -1244,6 +1253,20 @@ function editor_note_validate_size($element, &$form_state) {
 }
 
 /**
+ * Validate callback for 'editor_note_field_widget_form'.
+ *
+ * @param array $form
+ * @param array $form_state
+ */
+function editor_note_add_note_validate(&$form, &$form_state) {
+  $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
+  $field_info = field_info_instance($form['#entity_type'], $field_name, $form['#bundle']);
+  if (empty($form_state['values'][$field_name][LANGUAGE_NONE][0]['note'])) {
+    form_set_error($field_name, t('Field %field_name is required.', array('%field_name' => $field_info['label'])));
+  }
+}
+
+/**
  * Ajax callback for 'Add note' button in 'editor_note_field_widget_form'.
  *
  * @param array $form
@@ -1271,11 +1294,6 @@ function editor_note_add_note(&$form, &$form_state) {
         'message_type' => 'error',
       )
     );
-
-    $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $message);
-
-    // Returns textarea for adding notes with red border indicates that an error has occurred.
-    $ajax_commands[] = ajax_command_replace('#textarea_' . $field_name, drupal_render($form[$field_name][LANGUAGE_NONE][0]['note']));
   }
   else {
     // Adds note entity to the database.
@@ -1291,8 +1309,6 @@ function editor_note_add_note(&$form, &$form_state) {
       )
     );
 
-    $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $message);
-
     // Updates notes table and pager.
     $field = field_info_field($field_name);
     $notes = editor_note_get_notes($entity_type, $entity, $field);
@@ -1301,27 +1317,15 @@ function editor_note_add_note(&$form, &$form_state) {
 
     // Returns blank textarea for adding notes.
     $form[$field_name][LANGUAGE_NONE][0]['note']['#default_value'] = '';
-    $ajax_commands[] = ajax_command_replace('#textarea_' . $field_name, drupal_render($form[$field_name][LANGUAGE_NONE][0]['note']));
   }
+
+  $ajax_commands[] = ajax_command_replace('#status_message_' . $field_name, $message);
+  $ajax_commands[] = ajax_command_replace('#textarea_' . $field_name, drupal_render($form[$field_name][LANGUAGE_NONE][0]['note']));
 
   return array(
     '#type' => 'ajax',
     '#commands' => $ajax_commands,
   );
-}
-
-/**
- * Validate callback for 'editor_note_field_widget_form'.
- *
- * @param array $form
- * @param array $form_state
- */
-function editor_note_add_note_validate(&$form, &$form_state) {
-  $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
-  $field_info = field_info_instance($form['#entity_type'], $field_name, $form['#bundle']);
-  if (empty($form_state['values'][$field_name][LANGUAGE_NONE][0]['note'])) {
-    form_set_error($field_name, t('Field %field_name is required.', array('%field_name' => $field_info['label'])));
-  }
 }
 
 /**

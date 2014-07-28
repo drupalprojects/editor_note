@@ -19,8 +19,8 @@ function editor_note_schema() {
       'note' => array(
         'type' => 'text',
         'not null' => TRUE,
-        'size' => 'big',
-        'description' => 'Content of an note.',
+        'size' => 'medium',
+        'description' => 'Content of the note.',
       ),
       'entity_type' => array(
         'type' => 'varchar',
