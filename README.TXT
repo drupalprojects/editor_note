@@ -6,6 +6,9 @@ Project for Drupal 7.
 The modules improves administration/editorial usability and provides
 configurable "Editor Notes" field, which can be added to any Drupal entity.
 
+In general concept of 'Editor Notes' is similar to 'Comments'. The main difference
+is that 'Editor Notes' are for editors and admins rather than for end users.
+
 Use case
 ========
 

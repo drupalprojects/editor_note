@@ -6,9 +6,6 @@
  */
 
 /**
- * @todo cardinality should be 1, instead it will be 10, 50, 100 or more empty items in $form_state['values'].
- * @todo hide/show textarea and button depending on notes count and cardinality setting (@see editor_note_add_note(), editor_note_confirm_remove_form_remove()).
- *
  * @todo add wysiwyg/filtered text support in the future, add 'format' column in schema.
  *
  * @todo implement hooks and think about .api.php file.
@@ -22,6 +19,8 @@ function editor_note_help($path, $arg) {
     $output = '<h3>' . t('About') . '</h3>';
     $output .= '<p>' . t('The modules improves administration/editorial usability and provides configurable "Editor Notes" field,
     which can be added to any Drupal entity.') . '</p>';
+    $output .= '<p>' . t('In general concept of "Editor Notes" is similar to "Comments". The main difference is
+    that "Editor Notes" are for editors and admins rather than for end users.') . '</p>';
 
     $output .= '<h3>' . t('Use case') . '</h3>';
     $use_case = array(
@@ -532,12 +531,12 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
  */
 function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
-    // Modifies cardinality field.
-    $form['field']['cardinality']['#options'] = array(-1 => t('Unlimited')) +
-      drupal_map_assoc(array(5, 10, 20, 30, 40, 50, 70, 100));
-    $form['field']['cardinality']['#default_value'] = isset($form['field']['cardinality']['#default_value']) ?
-      $form['field']['cardinality']['#default_value'] : -1;
-    $form['field']['cardinality']['#description'] = t('Maximum number of values that field can store.');
+    // Makes cardinality field hidden for the field type because the editor is allowed
+    // to submit unrestricted amount of notes.
+    $form['field']['cardinality'] = array(
+      '#type' => 'value',
+      '#value' => 1,
+    );
   }
 }
 
@@ -571,11 +570,12 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       '#type' => 'textarea',
       '#prefix' => '<div id="textarea_' . $field['field_name'] . '">',
       '#suffix' => '</div>',
-      '#title' => check_plain($instance['label']),
+      '#title' => check_plain($instance['label']) . ($instance['required'] ? ' ' . theme('form_required_marker') : ''),
       '#default_value' => isset($items[$delta]['note']) ? $items[$delta]['note'] : '',
       '#description' => check_plain($instance['description']),
       '#rows' => $field['settings']['notes_size'],
       '#resizable' => FALSE,
+      '#weight' => $field['settings']['display'] ? 1 : 4,
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
         'placeholder' => t($field['settings']['notes_placeholder']),
@@ -587,6 +587,15 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
     }
 
     if (isset($entity_id)) {
+      $notes = editor_note_get_notes($instance['entity_type'], $form['#entity'], $field);
+
+      if (!empty($notes)) {
+        // Load CTools components for modal popups.
+        editor_note_load_ctools_modal($field);
+      }
+
+      $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
+
       // Display 'Add Note' button only if entity has been already created and stored in the database.
       $element['note_add'] = array(
         '#type' => 'submit',
@@ -595,10 +604,25 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
         '#submit' => array('editor_note_add_note_submit'),
         '#validate' => array('editor_note_add_note_validate'),
         '#limit_validation_errors' => array(array($field['field_name'])),
+        '#weight' => $field['settings']['display'] ? 2 : 5,
         '#ajax' => array(
           'callback' => 'editor_note_add_note',
           'event' => 'click',
         ),
+      );
+
+      $element['message'] = array(
+        '#type' => 'container',
+        '#attributes' => array(
+          'id' => array('status_message_' . $element['#field_name']),
+        ),
+        '#value' => '',
+        '#weight' => 3,
+      );
+
+      $element['formatted_notes'] = array(
+        '#markup' => drupal_render($formatted_notes),
+        '#weight' => $field['settings']['display'] ? 4 : 1,
       );
 
       $element['note_entity_id'] = array(
@@ -838,98 +862,6 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
 }
 
 /**
- * Implements hook_theme_registry_alter().
- *
- * Replaces default 'field_multiple_value_form' theme function with a custom function.
- */
-function editor_note_theme_registry_alter(&$theme_registry) {
-  if (isset($theme_registry['field_multiple_value_form'])) {
-    $theme_registry['field_multiple_value_form']['type'] = 'module';
-    $theme_registry['field_multiple_value_form']['theme path'] = drupal_get_path('module', ' notes_field');
-    $theme_registry['field_multiple_value_form']['function'] =  'editor_note_theme_field_multiple_value_form';
-  }
-}
-
-/**
- * Overrides multiple-value form widget for 'notes' field widget form.
- *
- * @see theme_field_multiple_value_form().
- *
- * @param array $variables
- *
- * @return array
- */
-function editor_note_theme_field_multiple_value_form($variables) {
-  $element = $variables['element'];
-  $field_info = field_info_field($variables['element']['#field_name']);
-  if ($field_info['type'] == 'editor_note') {
-    // Custom function for 'notes' field widget form.
-    // 'Notes' cardinality is always > 1 because 'editor notes' field makes sense
-    // when at least 2 editors work on same material.
-    $output = editor_note_theme_widget_form($variables, $element);
-  }
-  else {
-    // Otherwise default theme function.
-    $output = theme_field_multiple_value_form($variables);
-  }
-
-  return $output;
-}
-
-/**
- * Custom widget form for 'notes' field.
- *
- * @param array $variables
- * @param array $element
- *
- * @return string
- */
-function editor_note_theme_widget_form($variables, $element) {
-  $output = array();
-  $add_note_widget = array();
-
-  $field = field_info_field($element['#field_name']);
-  $notes = editor_note_get_notes($element[0]['#entity_type'], $element[0]['#entity'], $field);
-  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
-
-  // Cardinality by default -1 for unlimited values.
-  if ($field['cardinality'] < 0 || count($notes) < $field['cardinality']) {
-    $add_note_widget = $element[0];
-    $required = $element['#required'] ? ' ' . theme('form_required_marker', $variables) : '';
-    if ($required) {
-      // Adds required mark to the title of 'Add Note' field.
-      $add_note_widget['note']['#title'] .= $required;
-    }
-    if (isset($add_note_widget['_weight'])) {
-      // Hides $items['_weight'] from display.
-      $add_note_widget['_weight']['#attributes']['class'][] = 'element-invisible';
-    }
-  }
-
-  $status_message_container = array(
-    '#theme' => 'html_tag',
-    '#tag' => 'div',
-    '#attributes' => array(
-      'id' => array('status_message_' . $element['#field_name']),
-    ),
-    '#value' => '',
-  );
-
-  if ($field['settings']['display']) {
-    $output[] = drupal_render($add_note_widget);
-    $output[] = drupal_render($status_message_container);
-    $output[] = drupal_render($formatted_notes);
-  }
-  else {
-    $output[] = drupal_render($formatted_notes);
-    $output[] = drupal_render($status_message_container);
-    $output[] = drupal_render($add_note_widget);
-  }
-
-  return '<div class="form-item">' . implode('', $output) . '</div>';
-}
-
-/**
  * Saves note.
  *
  * @param string $note
@@ -1115,8 +1047,6 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
         'data' => t('Actions'),
         'class' => array('field-operations'),
       );
-
-      editor_note_load_ctools_modal($field);
     }
 
     foreach ($notes as $note_id => $item) {
