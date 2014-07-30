@@ -6,12 +6,6 @@
  */
 
 /**
- * @todo label of empty field shows up in formatter.
- * 
- * @todo add wysiwyg/filtered text support in the future, add 'format' column in schema, think about permissions to access format.
- */
-
-/**
  * Implements hook_help().
  */
 function editor_note_help($path, $arg) {
@@ -56,14 +50,16 @@ function editor_note_help($path, $arg) {
     );
     $output .= theme('item_list', array('items' => $installation, 'type' => 'ol'));
 
-    $output .= '<h3>' . t('Credit') . '</h3>';
+    $output .= '<h3>' . t('Sponsorship') . '</h3>';
     $credit = array(
       l('EPAM Systems', 'https://www.drupal.org/node/2114867'),
       l('NBC Universal', 'http://www.nbcuni.com'),
     );
     $output .= '<p>' . t('This project was sponsored by') . ':</p>';
     $output .= theme('item_list', array('items' => $credit));
-    $output .= '<p>' . t('Many thanks to !username1 and !username2 for reviewing the module.',
+
+    $output .= '<h3>' . t('Acknowledgments') . '</h3>';
+    $output .= '<p>' . t('Special thanks to !username1 and !username2 for reviewing the module.',
       array(
         '!username1' => l('Sergei Churilo', 'https://www.drupal.org/user/584658'),
         '!username2' => l('Alexey Yahnenko', 'https://www.drupal.org/user/2635711'))
@@ -852,7 +848,9 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
   $display['field_name'] = $field['field_name'];
   if ($display['type'] == 'editor_note_field_formatter') {
     $notes = editor_note_get_notes($entity_type, $entity, $display);
-    $element[][$field['field_name']] = editor_note_get_formatted_notes($display, $notes);
+    if (!empty($notes)) {
+      $element[][$field['field_name']] = editor_note_get_formatted_notes($display, $notes);
+    }
   }
 
   return $element;
@@ -913,34 +911,12 @@ function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
 }
 
 /**
- * Loads multiple notes based on certain conditions.
- *
- * @param $note_ids
- * @param array $conditions
- * @param bool $reset
- *
- * @return bool|object
- */
-function editor_note_load_multiple($note_ids, $conditions = array(), $reset = FALSE) {
-  return entity_load('editor_note', $note_ids, $conditions, $reset);
-}
-
-/**
  * Deletes single note.
  *
  * @param $note_id
  */
 function editor_note_delete($note_id) {
   entity_delete('editor_note', $note_id);
-}
-
-/**
- * Deletes multiple notes.
- *
- * @param int|string $note_ids
- */
-function editor_note_delete_multiple($note_ids) {
-  entity_delete_multiple('editor_note', $note_ids);
 }
 
 /**

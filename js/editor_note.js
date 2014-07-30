@@ -21,7 +21,7 @@
       var editorNoteContainer = '#' + Drupal.settings.editorNoteContainer;
       $(editorNoteContainer + ' .pager li a').each(function() {
         var pagerLinkPath = $(this).attr('href');
-        if (pagerLinkPath !== '' && !(pagerLinkPath.indexOf(editorNoteContainer) + 1)) {
+        if (pagerLinkPath !== undefined && pagerLinkPath !== '' && !(pagerLinkPath.indexOf(editorNoteContainer) + 1)) {
           pagerLinkPath += editorNoteContainer;
           $(this).attr('href', pagerLinkPath);
         }

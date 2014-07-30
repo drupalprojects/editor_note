@@ -44,7 +44,7 @@ Installation
 3. Create new or edit existing content type and add a new field of type
    'Editor Notes' (admin/structure/types in D7).
 
-Credit
+Sponsorship
 ============
 
 This project was sponsored by:
@@ -52,7 +52,10 @@ This project was sponsored by:
 * EPAM Systems (http://www.epam.com, https://www.drupal.org/node/2114867)
 * NBC Universal (http://www.nbcuni.com)
 
-Many thanks to Sergei Churilo (https://www.drupal.org/user/584658)
+Acknowledgments
+===============
+
+Special thanks to Sergei Churilo (https://www.drupal.org/user/584658)
 and Alexey Yahnenko (https://www.drupal.org/user/2635711) for reviewing the module.
 
 Author
