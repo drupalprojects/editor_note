@@ -1062,7 +1062,7 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
       $rows[$counter] = array(
         'data' => array(
           'note' => array(
-            'data' => $item->note,
+            'data' => check_plain($item->note),
             'class' => array('note'),
           ),
           'author' => array(
