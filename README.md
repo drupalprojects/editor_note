@@ -5,8 +5,9 @@ Project for Drupal 7.
 The modules improves administration/editorial usability and provides
 configurable "Editor Notes" field, which can be added to any Drupal entity.
 
-In general concept of 'Editor Notes' is similar to 'Comments'. The main difference
-is that 'Editor Notes' are for editors and admins rather than for end users.
+In general concept of 'Editor Notes' is similar to 'Comments'.
+The main difference is that 'Editor Notes' are for editors and admins
+rather than for end users.
 
 Use case
 --------
@@ -17,7 +18,8 @@ Use case
 * This field can also be added to any Drupal fieldable entity (user etc).
 * List of previously added notes displays in 'content edit' form in configurable
   table.
-* Notes can also be displayed for the end user in configurable table if necessary.
+* Notes can also be displayed for the end user in configurable table
+  if necessary.
 
 Features
 --------
@@ -54,7 +56,8 @@ This project was sponsored by:
 Acknowledgments
 ---------------
 
-Special thanks to [Sergei Churilo] and [Alexey Yahnenko] for reviewing the module.
+Special thanks to [Sergei Churilo] and [Alexey Yahnenko]
+for reviewing the module.
 
 Author
 ------
