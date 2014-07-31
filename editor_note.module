@@ -627,7 +627,8 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       if (isset($form_state['triggering_element']['#name']) &&
         $form_state['triggering_element']['#name'] == $field['field_name'] . '_add_note') {
         // Fixing Ajax #default_value issue, https://drupal.org/node/1082818.
-        unset($form_state['input'][$field['field_name']][LANGUAGE_NONE][0]['note']);
+        $storage = 'input';
+        unset($form_state[$storage][$field['field_name']][LANGUAGE_NONE][0]['note']);
       }
     }
   }
