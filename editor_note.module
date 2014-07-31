@@ -45,15 +45,15 @@ function editor_note_help($path, $arg) {
     $output .= '<h3>' . t('Installation') . '</h3>';
     $installation = array(
       t('Drop the entire Editor Note module into your "sites/all/modules" folder.'),
-      t('Enable the module from the !page.', array('!page' => l('modules page', 'admin/modules'))),
+      t('Enable the module from the !page.', array('!page' => l(t('modules page'), 'admin/modules'))),
       t('Create new or edit existing content type and add a new field of type "Editor Notes".'),
     );
     $output .= theme('item_list', array('items' => $installation, 'type' => 'ol'));
 
     $output .= '<h3>' . t('Sponsorship') . '</h3>';
     $credit = array(
-      l('EPAM Systems', 'https://www.drupal.org/node/2114867'),
-      l('NBC Universal', 'http://www.nbcuni.com'),
+      l(t('EPAM Systems'), 'https://www.drupal.org/node/2114867'),
+      l(t('NBC Universal'), 'http://www.nbcuni.com'),
     );
     $output .= '<p>' . t('This project was sponsored by') . ':</p>';
     $output .= theme('item_list', array('items' => $credit));
@@ -61,12 +61,12 @@ function editor_note_help($path, $arg) {
     $output .= '<h3>' . t('Acknowledgments') . '</h3>';
     $output .= '<p>' . t('Special thanks to !username1 and !username2 for reviewing the module.',
       array(
-        '!username1' => l('Sergei Churilo', 'https://www.drupal.org/user/584658'),
-        '!username2' => l('Alexey Yahnenko', 'https://www.drupal.org/user/2635711'))
+        '!username1' => l(t('Sergei Churilo'), 'https://www.drupal.org/user/584658'),
+        '!username2' => l(t('Alexey Yahnenko'), 'https://www.drupal.org/user/2635711'))
       ) . '</p>';
 
     $output .= '<h3>' . t('Author') . '</h3>';
-    $output .= '<p>' . l('Rostislav Sergeenkov', 'https://www.drupal.org/u/rostislav-sergeenkov') . '</p>';
+    $output .= '<p>' . l(t('Rostislav Sergeenkov'), 'https://www.drupal.org/u/rostislav-sergeenkov') . '</p>';
 
     return $output;
   }
@@ -763,7 +763,7 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
       '#states' => array(
         'invisible' => array(
           'input[name="fields[' . $field['field_name'] . '][settings_edit_form][settings][limit]"]' =>
-            array('value' => 0),
+          array('value' => 0),
         ),
       ),
     );
@@ -783,7 +783,7 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
       '#states' => array(
         'invisible' => array(
           'input[name="fields[' . $field['field_name'] . '][settings_edit_form][settings][pager][enabled]"]' =>
-            array('checked' => FALSE),
+          array('checked' => FALSE),
         ),
       ),
     );
@@ -798,8 +798,10 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
  * Displays summary of enabled settings for the field on Manage Display page.
  * Essential for proper work of hook_field_formatter_settings_form() because it adds
  * ajax-powered button that opens formatter_settings_form.
+ *
  * Note that button is present only if this hook returns non empty value.
- * @see field_ui_display_overview_form().
+ *
+ * @see field_ui_display_overview_form()
  */
 function editor_note_field_formatter_settings_summary($field, $instance, $view_mode) {
   $display = $instance['display'][$view_mode];
@@ -860,12 +862,19 @@ function editor_note_field_formatter_view($entity_type, $entity, $field, $instan
  * Saves note.
  *
  * @param string $note
+ *   The text of the note.
  * @param string $entity_type
+ *   The type of the entity.
  * @param object $entity
+ *   The entity object.
  * @param string $field_name
+ *   The machine field name.
  * @param int|string|null $uid
+ *   The unique ID of the author.
  * @param int|string|null $created
+ *   The Unix timestamp of the note creation.
  * @param int|string|null $changed
+ *   The Unix timestamp of the note update.
  */
 function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL, $created = NULL, $changed = NULL) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
@@ -896,10 +905,17 @@ function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL
  * Loads single note based on certain conditions.
  *
  * @param int|string $note_id
+ *   The unique ID of the note entry.
  * @param array $conditions
+ *   An associative array of conditions used by entity_load() (deprecated).
  * @param bool $reset
+ *   Whether to reset the internal cache for the requested entity type.
  *
- * @return int|bool
+ * @return object|bool
+ *   Success: loaded note object.
+ *   Fail: boolean indicating that query failed.
+ *
+ * @see entity_load()
  */
 function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
   $note_array = entity_load('editor_note', array($note_id), $conditions, $reset);
@@ -913,7 +929,8 @@ function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
 /**
  * Deletes single note.
  *
- * @param $note_id
+ * @param int|string $note_id
+ *   The unique ID of the note entry.
  */
 function editor_note_delete($note_id) {
   entity_delete('editor_note', $note_id);
@@ -923,11 +940,17 @@ function editor_note_delete($note_id) {
  * Returns array of notes per entity revision.
  *
  * @param string $entity_type
+ *   The type of the entity.
  * @param object $entity
+ *   The entity object.
  * @param array $field
- * @param bool $id_only returns array of note ids instead of fully loaded notes.
+ *   The field data about an individual field.
+ * @param bool $id_only
+ *   Determines whether to return an array of note ids instead of
+ *   fully loaded notes.
  *
- * @return mixed
+ * @return array
+ *   An associative array, or an empty array if there is no result set.
  */
 function editor_note_get_notes($entity_type, $entity, $field, $id_only = FALSE) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
@@ -980,11 +1003,19 @@ function editor_note_get_notes($entity_type, $entity, $field, $id_only = FALSE) 
  * Returns formatted notes table.
  *
  * @param array $field
+ *   The field data about an individual field.
  * @param array $notes
+ *   Array of notes data returned by editor_note_get_notes().
  * @param bool $widget
+ *   Determines whether to use function in widget along with controls or
+ *   display it in formatter as just a table without controls.
  * @param string|null $edit_path
+ *   Path of the edit form where field is used. Fixes pager on ajax refresh.
  *
  * @return array
+ *   Returns formatted notes ready for rendering.
+ *
+ * @see editor_note_get_notes()
  */
 function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_path = NULL) {
   $formatted_notes = array(
@@ -1080,7 +1111,7 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
       '#rows' => $rows,
       '#attributes' => array(
         'class' => array('field-notes-table'),
-      )
+      ),
     );
 
     if ($field['settings']['pager']['enabled']) {
@@ -1133,8 +1164,10 @@ function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_
  * Defines access callback for CRUD operations.
  *
  * @param int|string $note_id
+ *   The unique ID of the note entry.
  *
  * @return bool
+ *   Boolean indicating whether the user may perform operations on notes or not.
  */
 function editor_note_access_crud_operations($note_id) {
   global $user;
@@ -1148,7 +1181,9 @@ function editor_note_access_crud_operations($note_id) {
  * Creates form element validation handler for integer elements that must be positive or 0.
  *
  * @param array $element
+ *   The form element.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   // Checks for positive integer (or zero) value.
@@ -1162,7 +1197,9 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
  * Creates form element validation handler for float elements that must be >= 0 or <= 1.
  *
  * @param array $element
+ *   The form element.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_validate_float_positive_or_zero($element, &$form_state) {
   $value = trim($element['#value']);
@@ -1175,7 +1212,9 @@ function editor_note_validate_float_positive_or_zero($element, &$form_state) {
  * Creates form element validation handler for HEX value.
  *
  * @param array $element
+ *   The form element.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_validate_hex($element, &$form_state) {
   preg_match('/^[0-9A-Fa-f]{6}$/', trim($element['#value']), $matches);
@@ -1188,7 +1227,9 @@ function editor_note_validate_hex($element, &$form_state) {
  * Creates form element validation handler for HEX value.
  *
  * @param array $element
+ *   The form element.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_validate_size($element, &$form_state) {
   $value = $element['#value'];
@@ -1204,7 +1245,9 @@ function editor_note_validate_size($element, &$form_state) {
  * Validate callback for 'editor_note_field_widget_form'.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_add_note_validate(&$form, &$form_state) {
   $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
@@ -1218,9 +1261,12 @@ function editor_note_add_note_validate(&$form, &$form_state) {
  * Ajax callback for 'Add note' button in 'editor_note_field_widget_form'.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
+ *   The submitted values.
  *
  * @return array
+ *   Drupal ajax framework commands.
  */
 function editor_note_add_note(&$form, &$form_state) {
   $ajax_commands = array();
@@ -1280,7 +1326,9 @@ function editor_note_add_note(&$form, &$form_state) {
  * Submit callback for 'editor_note_field_widget_form'.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_add_note_submit(&$form, &$form_state) {
   $form_state['rebuild'] = TRUE;
@@ -1290,6 +1338,7 @@ function editor_note_add_note_submit(&$form, &$form_state) {
  * Enables support of CTools module for Ajax operations.
  *
  * @param array $field
+ *   The field data about an individual field.
  */
 function editor_note_load_ctools_modal($field) {
   // Includes the CTools tools that we need.
@@ -1342,8 +1391,10 @@ function editor_note_load_ctools_modal($field) {
  * Returns formatted status message for Ajax-triggered actions.
  *
  * @param array $variables
+ *   Variables registered in editor_note_theme().
  *
  * @return string
+ *   Formatted message.
  */
 function theme_editor_note_message($variables) {
   $field_name = $variables['field_name'];

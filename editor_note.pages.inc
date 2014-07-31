@@ -9,12 +9,14 @@
  * Builds confirmation page for updating selected note.
  *
  * @param string|null $ajax
- * @param string|int|null $id
+ *   Determines whether the form called via ajax or not.
+ * @param string|int|null $note_id
+ *   The unique ID of the note entry.
  *
  * @return null|array
  */
-function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
-  if ($id == NULL) {
+function editor_note_confirm_edit_page($ajax = NULL, $note_id = NULL) {
+  if ($note_id == NULL) {
     return t('Error: no note id was sent.');
   }
 
@@ -39,7 +41,7 @@ function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
     drupal_exit();
   }
   else {
-    return drupal_get_form('editor_note_confirm_edit_form', $id);
+    return drupal_get_form('editor_note_confirm_edit_form', $note_id);
   }
 }
 
@@ -47,14 +49,19 @@ function editor_note_confirm_edit_page($ajax = NULL, $id = NULL) {
  * Builds confirmation form for editing the note which displays in popup.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
- * @param int|string $id
+ *   The submitted values.
+ * @param int|string $note_id
+ *   The unique ID of the note entry.
  *
  * @return array
+ *   Form data for 'edit note' confirmation popup.
  */
-function editor_note_confirm_edit_form($form, $form_state, $id) {
+function editor_note_confirm_edit_form($form, $form_state, $note_id) {
+  $note_id = isset($note_id) ? $note_id : (int) arg(3);
   $form = array();
-  $note = editor_note_load(arg(3));
+  $note = editor_note_load($note_id);
 
   if ($note) {
     $field = field_info_field($note->field_name);
@@ -130,7 +137,9 @@ function editor_note_confirm_edit_form($form, $form_state, $id) {
  * Ajax callback for 'Update' button in 'editor_note_confirm_edit_form'.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   global $user;
@@ -175,12 +184,15 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
  * Builds confirmation page for removing selected note.
  *
  * @param string|null $ajax
- * @param string|int|null $id
+ *   Determines whether the form called via ajax or not.
+ * @param string|int|null $note_id
+ *   The unique ID of the note entry.
  *
  * @return null|array
+ *   Form data for 'remove note' confirmation popup.
  */
-function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
-  if ($id == NULL) {
+function editor_note_confirm_remove_page($ajax = NULL, $note_id = NULL) {
+  if ($note_id == NULL) {
     return t('Error: no note id was sent.');
   }
 
@@ -205,7 +217,7 @@ function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
     drupal_exit();
   }
   else {
-    return drupal_get_form('editor_note_confirm_remove_form', $id);
+    return drupal_get_form('editor_note_confirm_remove_form', $note_id);
   }
 }
 
@@ -213,14 +225,19 @@ function editor_note_confirm_remove_page($ajax = NULL, $id = NULL) {
  * Builds confirmation form for removing the note which displays in popup.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
- * @param int|string $id
+ *   The submitted values.
+ * @param int|string $note_id
+ *   The unique ID of the note entry.
  *
  * @return array
+ *   Form data for 'remove note' confirmation popup.
  */
-function editor_note_confirm_remove_form($form, $form_state, $id) {
+function editor_note_confirm_remove_form($form, $form_state, $note_id) {
+  $note_id = isset($note_id) ? $note_id : (int) arg(3);
   $form = array();
-  $note = editor_note_load(arg(3));
+  $note = editor_note_load($note_id);
 
   if ($note) {
     $form['note'] = array(
@@ -285,7 +302,9 @@ function editor_note_confirm_remove_form($form, $form_state, $id) {
  * Ajax callback for 'Remove' button in 'editor_note_confirm_remove_form'.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   $field_name = $form_state['values']['note_field_name'];
@@ -325,7 +344,9 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
  * Ajax callback for 'Cancel' button in 'editor_note_confirm_remove_form'.
  *
  * @param array $form
+ *   The form data.
  * @param array $form_state
+ *   The submitted values.
  */
 function editor_note_confirm_form_cancel(&$form, &$form_state) {
   $field_name = $form_state['values']['note_field_name'];
