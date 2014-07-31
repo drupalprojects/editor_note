@@ -917,7 +917,7 @@ function editor_note_save($note, $entity_type, $entity, $field_name, $uid = NULL
  *
  * @see entity_load()
  */
-function editor_note_load($note_id, $conditions = array(), $reset = FALSE) {
+function editor_note_load($note_id, array $conditions = array(), $reset = FALSE) {
   $note_array = entity_load('editor_note', array($note_id), $conditions, $reset);
   if (!empty($note_array)) {
     return $note_array[$note_id];
@@ -952,7 +952,7 @@ function editor_note_delete($note_id) {
  * @return array
  *   An associative array, or an empty array if there is no result set.
  */
-function editor_note_get_notes($entity_type, $entity, $field, $id_only = FALSE) {
+function editor_note_get_notes($entity_type, $entity, array $field, $id_only = FALSE) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
   if (!isset($revision_id)) {
     $revision_id = $entity_id;
@@ -1017,7 +1017,7 @@ function editor_note_get_notes($entity_type, $entity, $field, $id_only = FALSE) 
  *
  * @see editor_note_get_notes()
  */
-function editor_note_get_formatted_notes($field, $notes, $widget = FALSE, $edit_path = NULL) {
+function editor_note_get_formatted_notes(array $field, array $notes, $widget = FALSE, $edit_path = NULL) {
   $formatted_notes = array(
     '#prefix' => '<div id="formatted_notes_' . $field['field_name'] . '">',
     '#suffix' => '</div>',
@@ -1179,11 +1179,6 @@ function editor_note_access_crud_operations($note_id) {
 
 /**
  * Creates form element validation handler for integer elements that must be positive or 0.
- *
- * @param array $element
- *   The form element.
- * @param array $form_state
- *   The submitted values.
  */
 function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   // Checks for positive integer (or zero) value.
@@ -1195,11 +1190,6 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 
 /**
  * Creates form element validation handler for float elements that must be >= 0 or <= 1.
- *
- * @param array $element
- *   The form element.
- * @param array $form_state
- *   The submitted values.
  */
 function editor_note_validate_float_positive_or_zero($element, &$form_state) {
   $value = trim($element['#value']);
@@ -1210,11 +1200,6 @@ function editor_note_validate_float_positive_or_zero($element, &$form_state) {
 
 /**
  * Creates form element validation handler for HEX value.
- *
- * @param array $element
- *   The form element.
- * @param array $form_state
- *   The submitted values.
  */
 function editor_note_validate_hex($element, &$form_state) {
   preg_match('/^[0-9A-Fa-f]{6}$/', trim($element['#value']), $matches);
@@ -1225,11 +1210,6 @@ function editor_note_validate_hex($element, &$form_state) {
 
 /**
  * Creates form element validation handler for HEX value.
- *
- * @param array $element
- *   The form element.
- * @param array $form_state
- *   The submitted values.
  */
 function editor_note_validate_size($element, &$form_state) {
   $value = $element['#value'];
@@ -1243,11 +1223,6 @@ function editor_note_validate_size($element, &$form_state) {
 
 /**
  * Validate callback for 'editor_note_field_widget_form'.
- *
- * @param array $form
- *   The form data.
- * @param array $form_state
- *   The submitted values.
  */
 function editor_note_add_note_validate(&$form, &$form_state) {
   $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
@@ -1259,14 +1234,6 @@ function editor_note_add_note_validate(&$form, &$form_state) {
 
 /**
  * Ajax callback for 'Add note' button in 'editor_note_field_widget_form'.
- *
- * @param array $form
- *   The form data.
- * @param array $form_state
- *   The submitted values.
- *
- * @return array
- *   Drupal ajax framework commands.
  */
 function editor_note_add_note(&$form, &$form_state) {
   $ajax_commands = array();
@@ -1324,11 +1291,6 @@ function editor_note_add_note(&$form, &$form_state) {
 
 /**
  * Submit callback for 'editor_note_field_widget_form'.
- *
- * @param array $form
- *   The form data.
- * @param array $form_state
- *   The submitted values.
  */
 function editor_note_add_note_submit(&$form, &$form_state) {
   $form_state['rebuild'] = TRUE;
@@ -1340,7 +1302,7 @@ function editor_note_add_note_submit(&$form, &$form_state) {
  * @param array $field
  *   The field data about an individual field.
  */
-function editor_note_load_ctools_modal($field) {
+function editor_note_load_ctools_modal(array $field) {
   // Includes the CTools tools that we need.
   ctools_include('ajax');
   ctools_include('modal');
@@ -1354,9 +1316,9 @@ function editor_note_load_ctools_modal($field) {
       'modalSize' => array(
         'type' => 'fixed',
         'width' => $field['settings']['modal']['remove']['width'] == 'auto' ?
-            $field['settings']['modal']['remove']['width'] : (int) $field['settings']['modal']['remove']['width'],
+        $field['settings']['modal']['remove']['width'] : (int) $field['settings']['modal']['remove']['width'],
         'height' => $field['settings']['modal']['remove']['height'] == 'auto' ?
-            $field['settings']['modal']['remove']['height'] : (int) $field['settings']['modal']['remove']['height'],
+        $field['settings']['modal']['remove']['height'] : (int) $field['settings']['modal']['remove']['height'],
       ),
       'modalOptions' => array(
         'opacity' => $field['settings']['modal']['overlay']['opacity'],
@@ -1368,9 +1330,9 @@ function editor_note_load_ctools_modal($field) {
       'modalSize' => array(
         'type' => 'fixed',
         'width' => $field['settings']['modal']['edit']['width'] == 'auto' ?
-            $field['settings']['modal']['edit']['width'] : (int) $field['settings']['modal']['edit']['width'],
+        $field['settings']['modal']['edit']['width'] : (int) $field['settings']['modal']['edit']['width'],
         'height' => $field['settings']['modal']['edit']['height'] == 'auto' ?
-            $field['settings']['modal']['edit']['height'] : (int) $field['settings']['modal']['edit']['height'],
+        $field['settings']['modal']['edit']['height'] : (int) $field['settings']['modal']['edit']['height'],
       ),
       'modalOptions' => array(
         'opacity' => $field['settings']['modal']['overlay']['opacity'],
@@ -1389,12 +1351,6 @@ function editor_note_load_ctools_modal($field) {
 
 /**
  * Returns formatted status message for Ajax-triggered actions.
- *
- * @param array $variables
- *   Variables registered in editor_note_theme().
- *
- * @return string
- *   Formatted message.
  */
 function theme_editor_note_message($variables) {
   $field_name = $variables['field_name'];

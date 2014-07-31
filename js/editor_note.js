@@ -2,6 +2,7 @@
  * @file
  * Attaches the behaviors for the Editor Notes field.
  */
+
 (function ($) {
   /**
    * Alters pager links if pager is present in Editor Notes.
