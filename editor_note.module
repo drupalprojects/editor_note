@@ -527,8 +527,8 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
  */
 function editor_note_form_field_ui_field_edit_form_alter(&$form, &$form_state, $form_id) {
   if ($form['#field']['type'] == 'editor_note') {
-    // Makes cardinality field hidden for the field type because the editor is allowed
-    // to submit unrestricted amount of notes.
+    // Makes cardinality field hidden for the field type
+    // because the editor is allowed to submit unrestricted amount of notes.
     $form['field']['cardinality'] = array(
       '#type' => 'value',
       '#value' => 1,
@@ -589,7 +589,8 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       $notes = editor_note_get_notes($instance['entity_type'], $form['#entity'], $field);
       $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE);
 
-      // Display 'Add Note' button only if entity has been already created and stored in the database.
+      // Display 'Add Note' button only if entity has been already created
+      // and stored in the database.
       $element['note_add'] = array(
         '#type' => 'submit',
         '#name' => $field['field_name'] . '_add_note',
@@ -625,7 +626,7 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
 
       if (isset($form_state['triggering_element']['#name']) &&
         $form_state['triggering_element']['#name'] == $field['field_name'] . '_add_note') {
-        // Fixing Ajax #default_value issue, @see https://drupal.org/node/1082818.
+        // Fixing Ajax #default_value issue, https://drupal.org/node/1082818.
         unset($form_state['input'][$field['field_name']][LANGUAGE_NONE][0]['note']);
       }
     }
@@ -637,7 +638,8 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
 /**
  * Implements hook_field_validate().
  *
- * Defines messages that will be shown on validation of widget form using hook_field_widget_error().
+ * Defines messages that will be shown on validation of widget form
+ * using hook_field_widget_error().
  */
 function editor_note_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
   if ($field['type'] == 'editor_note') {
@@ -660,7 +662,8 @@ function editor_note_field_validate($entity_type, $entity, $field, $instance, $l
           );
         }
       }
-      // Validate first element since there can be only 1 textarea for adding notes (even for multiple value field).
+      // Validate first element since there can be only 1 textarea and 1 item
+      // for adding notes.
       break;
     }
   }
@@ -796,8 +799,8 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
  * Implements hook_field_formatter_settings_summary().
  *
  * Displays summary of enabled settings for the field on Manage Display page.
- * Essential for proper work of hook_field_formatter_settings_form() because it adds
- * ajax-powered button that opens formatter_settings_form.
+ * Essential for proper work of hook_field_formatter_settings_form() because
+ * it adds ajax-powered button that opens formatter_settings_form.
  *
  * Note that button is present only if this hook returns non empty value.
  *
@@ -825,7 +828,8 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
 /**
  * Implements hook_field_load().
  *
- * Defines custom load behavior for the field properties available in entity object.
+ * Defines custom load behavior for the field properties
+ * available in entity object.
  */
 function editor_note_field_load($entity_type, $entities, $field, $instances, $langcode, &$items, $age) {
   if ($field['type'] == 'editor_note') {
@@ -1119,8 +1123,10 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
       // in case if 2 fields are present at the same time.
       static $page_element = 0;
 
-      // Fixes pager on ajax refresh. Otherwise pager links point on /system/ajax after ajax refresh.
-      // @see https://www.drupal.org/node/1181370#comment-6088864 for more details.
+      // Fixes pager on ajax refresh.
+      // Otherwise pager links point on /system/ajax after ajax refresh.
+      // @see https://www.drupal.org/node/1181370#comment-6088864
+      // for more details.
       // @see theme_pager_link().
       if ($edit_path) {
         $_GET['q'] = $edit_path;
@@ -1142,7 +1148,8 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
       }
 
       if (module_exists('field_group')) {
-        // Remember which tab was active after page reload when navigating between pager links.
+        // Remember which tab was active after page reload
+        // when navigating between pager links.
         $settings = array(
           'editorNoteContainer' => drupal_html_class('edit-' . $field['field_name']),
         );
@@ -1178,7 +1185,8 @@ function editor_note_access_crud_operations($note_id) {
 }
 
 /**
- * Creates form element validation handler for integer elements that must be positive or 0.
+ * Creates form element validation handler for integer elements
+ * that must be positive or 0.
  */
 function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   // Checks for positive integer (or zero) value.
@@ -1189,7 +1197,8 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 }
 
 /**
- * Creates form element validation handler for float elements that must be >= 0 or <= 1.
+ * Creates form element validation handler for float elements
+ * that must be >= 0 or <= 1.
  */
 function editor_note_validate_float_positive_or_zero($element, &$form_state) {
   $value = trim($element['#value']);
@@ -1310,15 +1319,18 @@ function editor_note_load_ctools_modal(array $field) {
   // Adds CTools' javascript to the page.
   ctools_modal_add_js();
 
+  $modal_remove_width = $field['settings']['modal']['remove']['width'];
+  $modal_remove_height = $field['settings']['modal']['remove']['height'];
+  $modal_edit_width = $field['settings']['modal']['edit']['width'];
+  $modal_edit_height = $field['settings']['modal']['edit']['height'];
+
   // Creates javascript settings to customize modal.
   $modal_styles = array(
     drupal_html_class($field['field_name'] . '-remove') => array(
       'modalSize' => array(
         'type' => 'fixed',
-        'width' => $field['settings']['modal']['remove']['width'] == 'auto' ?
-        $field['settings']['modal']['remove']['width'] : (int) $field['settings']['modal']['remove']['width'],
-        'height' => $field['settings']['modal']['remove']['height'] == 'auto' ?
-        $field['settings']['modal']['remove']['height'] : (int) $field['settings']['modal']['remove']['height'],
+        'width' => $modal_remove_width == 'auto' ? $modal_remove_width : (int) $modal_remove_width,
+        'height' => $modal_remove_height == 'auto' ? $modal_remove_height : (int) $modal_remove_height,
       ),
       'modalOptions' => array(
         'opacity' => $field['settings']['modal']['overlay']['opacity'],
@@ -1329,10 +1341,8 @@ function editor_note_load_ctools_modal(array $field) {
     drupal_html_class($field['field_name'] . '-edit') => array(
       'modalSize' => array(
         'type' => 'fixed',
-        'width' => $field['settings']['modal']['edit']['width'] == 'auto' ?
-        $field['settings']['modal']['edit']['width'] : (int) $field['settings']['modal']['edit']['width'],
-        'height' => $field['settings']['modal']['edit']['height'] == 'auto' ?
-        $field['settings']['modal']['edit']['height'] : (int) $field['settings']['modal']['edit']['height'],
+        'width' => $modal_edit_width == 'auto' ? $modal_edit_width : (int) $modal_edit_width,
+        'height' => $modal_edit_height == 'auto' ? $modal_edit_height : (int) $modal_edit_height,
       ),
       'modalOptions' => array(
         'opacity' => $field['settings']['modal']['overlay']['opacity'],
