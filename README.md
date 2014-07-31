@@ -1,6 +1,5 @@
-
 About
-=====
+-----
 
 Project for Drupal 7.
 The modules improves administration/editorial usability and provides
@@ -10,7 +9,7 @@ In general concept of 'Editor Notes' is similar to 'Comments'. The main differen
 is that 'Editor Notes' are for editors and admins rather than for end users.
 
 Use case
-========
+--------
 
 * As website editor I can write status notes to myself and other editors working
   on the same material.
@@ -21,7 +20,7 @@ Use case
 * Notes can also be displayed for the end user in configurable table if necessary.
 
 Features
-========
+--------
 
 * Website editor can only add / update / delete his own notes by default.
 * However notes may also be updated or removed by any user with
@@ -31,13 +30,13 @@ Features
 * Module supports Views, content revisions and content translation.
 
 Requirements
-============
+------------
 
-Chaos tool suite (https://www.drupal.org/project/ctools)
-Entity API (https://www.drupal.org/project/entity)
+* [Chaos tool suite]
+* [Entity API]
 
 Installation
-============
+------------
 
 1. Drop the entire Editor Note module into your 'sites/all/modules' folder.
 2. Enable the module from the Administration area modules page (admin/modules).
@@ -45,20 +44,28 @@ Installation
    'Editor Notes' (admin/structure/types in D7).
 
 Sponsorship
-============
+-----------
 
 This project was sponsored by:
 
-* EPAM Systems (http://www.epam.com, https://www.drupal.org/node/2114867)
-* NBC Universal (http://www.nbcuni.com)
+* [EPAM Systems]
+* [NBC Universal]
 
 Acknowledgments
-===============
+---------------
 
-Special thanks to Sergei Churilo (https://www.drupal.org/user/584658)
-and Alexey Yahnenko (https://www.drupal.org/user/2635711) for reviewing the module.
+Special thanks to [Sergei Churilo] and [Alexey Yahnenko] for reviewing the module.
 
 Author
-======
+------
 
-Rostislav Sergeenkov (https://www.drupal.org/u/rostislav-sergeenkov)
+[Rostislav Sergeenkov]
+
+
+[Chaos tool suite]:https://www.drupal.org/project/ctools
+[Entity API]:https://www.drupal.org/project/entity
+[EPAM Systems]:https://www.drupal.org/node/2114867
+[NBC Universal]:http://www.nbcuni.com
+[Sergei Churilo]:https://www.drupal.org/user/584658
+[Alexey Yahnenko]:https://www.drupal.org/user/2635711
+[Rostislav Sergeenkov]:https://www.drupal.org/u/rostislav-sergeenkov
