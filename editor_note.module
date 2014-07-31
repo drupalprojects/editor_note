@@ -297,7 +297,7 @@ function editor_note_field_info() {
       'description' => t('Field for taking editor notes.'),
       'settings' => array(
         'notes_size' => 5,
-        'notes_placeholder' => 'Create a note',
+        'notes_placeholder' => t('Create a note'),
         'notes_maxlength' => 0,
         'limit' => 10,
         'order' => 'DESC',
@@ -359,7 +359,7 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
   $form['notes_placeholder'] = array(
     '#type' => 'textfield',
     '#title' => t('Placeholder for blank Notes field'),
-    '#default_value' => t($settings['notes_placeholder']),
+    '#default_value' => $settings['notes_placeholder'],
     '#required' => FALSE,
     '#description' => t('Specifies a short hint that describes the expected value of the textarea.'),
   );
@@ -574,7 +574,7 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       '#weight' => $field['settings']['display'] ? 1 : 4,
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
-        'placeholder' => t($field['settings']['notes_placeholder']),
+        'placeholder' => $field['settings']['notes_placeholder'],
       ),
     );
 
@@ -1185,8 +1185,7 @@ function editor_note_access_crud_operations($note_id) {
 }
 
 /**
- * Creates form element validation handler for integer elements
- * that must be positive or 0.
+ * Validation handler for integer elements that must be positive or 0.
  */
 function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   // Checks for positive integer (or zero) value.
@@ -1197,8 +1196,7 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 }
 
 /**
- * Creates form element validation handler for float elements
- * that must be >= 0 or <= 1.
+ * Validation handler for float elements that must be >= 0 or <= 1.
  */
 function editor_note_validate_float_positive_or_zero($element, &$form_state) {
   $value = trim($element['#value']);
@@ -1260,7 +1258,7 @@ function editor_note_add_note(&$form, &$form_state) {
       'editor_note_message',
       array(
         'field_name' => $field_name,
-        'message_text' => t($errors[$field_name]),
+        'message_text' => $errors[$field_name],
         'message_type' => 'error',
       )
     );

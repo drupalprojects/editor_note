@@ -58,7 +58,7 @@ function editor_note_confirm_edit_form($form, $form_state, $note_id) {
       '#resizable' => FALSE,
       '#attributes' => array(
         'maxlength' => $field['settings']['notes_maxlength'] > 0 ? $field['settings']['notes_maxlength'] : '',
-        'placeholder' => t($field['settings']['notes_placeholder']),
+        'placeholder' => $field['settings']['notes_placeholder'],
       ),
     );
 
