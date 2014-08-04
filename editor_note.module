@@ -35,6 +35,32 @@ function editor_note_help($path, $arg) {
     );
     $output .= theme('item_list', array('items' => $features));
 
+    $output .= '<h3>' . t('Similar Projects') . '</h3>';
+    $output .= '<p><strong>' . t('The key feature of the Editor Notes module is that editor
+    is able to add his own notes and browse notes of other editors directly in "edit content" form.
+    It saves time when adding/updating large amount of content.') . '</strong></p>';
+    $projects = array(
+      t('!module creates a block that displays a textarea pre-filled with the existing
+      comment for that specific page.', array('!module' => l(t('Admin Notes'), 'https://www.drupal.org/project/admin_notes'))),
+      t('!module introduces a new content type "sitenotes." It also creates
+      a menu item in the Admin >> Site building menu, where it is available only
+      to privileged users.', array('!module' => l(t('SiteNotes'), 'https://www.drupal.org/project/sitenotes'))),
+      t('!module consist of titles and text rendered into a block. The notes
+      are specific to each authenticated user on the site and can be added and
+      deleted only by the user who created them. They can only be viewed on
+      the website by the user who created them.', array('!module' => l(t('Personal Notes'), 'https://www.drupal.org/project/personal_notes'))),
+      t('!module creates a block with the ability to add, delete and edit notes
+      (ajaxified). Notes are stored on a per path basis and the block can
+      be made visible to certain roles/paths like any other block.',
+      array('!module' => l(t('Stickynote'), 'https://www.drupal.org/project/stickynote'))),
+    );
+    $output .= theme('item_list', array('items' => $projects));
+    $output .= '<p>' . t('The difference from mentioned above modules is that Editor Notes creates
+    configurable ajaxified field (instead of blocks or content type)
+    that can be attached to the entity and associated with that entity.
+    Each field item has its author and controls CRUD operations based on authorship
+    (in the way like Comment module does).') . '</p>';
+
     $output .= '<h3>' . t('Requirements') . '</h3>';
     $requirements = array(
       l(t('Chaos tool suite'), 'https://www.drupal.org/project/ctools'),
