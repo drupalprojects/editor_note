@@ -31,6 +31,32 @@ Features
   without page reload.
 * Module supports Views, content revisions and content translation.
 
+Similar Projects
+----------------
+
+1. [Admin Notes] creates a block that displays a textarea pre-filled with
+   the existing comment for that specific page.
+2. [SiteNotes] introduces a new content type "sitenotes." It also creates
+   a menu item in the Admin >> Site building menu, where it's available only
+   to privileged users.
+3. [Personal Notes] consist of titles and text rendered into a block.
+   The notes are specific to each authenticated user on the site
+   and can be added and deleted only by the user who created them. They can only
+   be viewed on the website by the user who created them.
+4. [Stickynote] creates a block with the ability to add, delete,
+   and edit notes (ajaxified). Notes are stored on a per path basis and
+   the block can be made visible to certain roles/paths like any other block.
+
+The difference from mentioned above modules is that Editor Notes creates
+configurable ajaxified field (instead of blocks or content type)
+that can be attached to the entity and associated with that entity.
+Each field item has its author and controls CRUD operations based on authorship
+(in the way like Comment module does).
+
+The key feature of the Editor Notes module is that editor is able to add his own
+notes and browse notes of other editors directly in 'edit content' form.
+It saves time when adding/updating large amount of content.
+
 Requirements
 ------------
 
@@ -65,6 +91,10 @@ Author
 [Rostislav Sergeenkov]
 
 
+[Admin Notes]:https://www.drupal.org/project/admin_notes
+[SiteNotes]:https://www.drupal.org/project/sitenotes
+[Personal Notes]:https://www.drupal.org/project/personal_notes
+[Stickynote]:https://www.drupal.org/project/stickynote
 [Chaos tool suite]:https://www.drupal.org/project/ctools
 [Entity API]:https://www.drupal.org/project/entity
 [EPAM Systems]:https://www.drupal.org/node/2114867
