@@ -16,15 +16,17 @@ function editor_note_help($path, $arg) {
     $output .= '<p>' . t('In general concept of "Editor Notes" is similar to "Comments". The main difference is
     that "Editor Notes" are for editors and admins rather than for end users.') . '</p>';
 
-    $output .= '<h3>' . t('Use case') . '</h3>';
-    $use_case = array(
+    $output .= '<h3>' . t('Usage') . '</h3>';
+    $usage = array(
       t('As website editor I can write status notes to myself and other editors working on the same material.'),
       t('The module provides "Editor Notes" field available on "Manage Fields" page.'),
       t('This field can also be added to any Drupal fieldable entity (user etc).'),
       t('List of previously added notes displays in "content edit" form in configurable table.'),
       t('Notes can also be displayed for the end user in configurable table if necessary.'),
+      t('When editor opens "content add" form for the first time he sees a field (textarea) providing him an option to add the first note.'),
+      t('When editor opens "content edit" form he sees "Editor Notes" widget with already added notes if any found.'),
     );
-    $output .= theme('item_list', array('items' => $use_case));
+    $output .= theme('item_list', array('items' => $usage));
 
     $output .= '<h3>' . t('Features') . '</h3>';
     $features = array(

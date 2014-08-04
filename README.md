@@ -9,7 +9,7 @@ In general concept of 'Editor Notes' is similar to 'Comments'.
 The main difference is that 'Editor Notes' are for editors and admins
 rather than for end users.
 
-Use case
+Usage
 --------
 
 * As website editor I can write status notes to myself and other editors working
@@ -20,6 +20,10 @@ Use case
   table.
 * Notes can also be displayed for the end user in configurable table
   if necessary.
+* When editor opens 'content add' form for the first time he sees a field
+  (textarea) providing him an option to add the first note.
+* When editor opens 'content edit' form he sees 'Editor Notes' widget
+  with already added notes if any found.
 
 Features
 --------
