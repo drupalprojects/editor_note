@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Main functionality for Notes Field module.
+ * Main functionality for Editor Notes module.
  */
 
 /**
@@ -11,10 +11,8 @@
 function editor_note_help($path, $arg) {
   if ($path == 'admin/help#editor_note') {
     $output = '<h3>' . t('About') . '</h3>';
-    $output .= '<p>' . t('The modules improves administration/editorial usability and provides configurable "Editor Notes" field,
-    which can be added to any Drupal entity.') . '</p>';
-    $output .= '<p>' . t('In general concept of "Editor Notes" is similar to "Comments". The main difference is
-    that "Editor Notes" are for editors and admins rather than for end users.') . '</p>';
+    $output .= '<p>' . t('The modules improves administration/editorial usability and provides configurable "Editor Notes" field, which can be added to any Drupal entity.') . '</p>';
+    $output .= '<p>' . t('Concept of "Editor Notes" is similar to "Comments". The main difference is that "Editor Notes" are for editors and admins rather than for end users.') . '</p>';
 
     $output .= '<h3>' . t('Usage') . '</h3>';
     $usage = array(
@@ -38,30 +36,21 @@ function editor_note_help($path, $arg) {
     $output .= theme('item_list', array('items' => $features));
 
     $output .= '<h3>' . t('Similar Projects') . '</h3>';
-    $output .= '<p><strong>' . t('The key feature of the Editor Notes module is that editor
-    is able to add his own notes and browse notes of other editors directly in "edit content" form.
-    It saves time when adding/updating large amount of content.') . '</strong></p>';
+    $output .= '<p><strong>' . t('The key feature of the Editor Notes module is that editor is able to browse (add/update/remove) notes directly in "edit content" form.') . '</strong></p>';
+    $output .= '<p>' . t('It helps to save time when adding/updating large amount of content.') . '</p>';
     $projects = array(
-      t('!module creates a block that displays a textarea pre-filled with the existing
-      comment for that specific page.', array('!module' => l(t('Admin Notes'), 'https://www.drupal.org/project/admin_notes'))),
-      t('!module introduces a new content type "sitenotes." It also creates
-      a menu item in the Admin >> Site building menu, where it is available only
-      to privileged users.', array('!module' => l(t('SiteNotes'), 'https://www.drupal.org/project/sitenotes'))),
-      t('!module consist of titles and text rendered into a block. The notes
-      are specific to each authenticated user on the site and can be added and
-      deleted only by the user who created them. They can only be viewed on
-      the website by the user who created them.', array('!module' => l(t('Personal Notes'), 'https://www.drupal.org/project/personal_notes'))),
-      t('!module creates a block with the ability to add, delete and edit notes
-      (ajaxified). Notes are stored on a per path basis and the block can
-      be made visible to certain roles/paths like any other block.',
+      t('!module creates a block that displays a textarea pre-filled with the existing comment for that specific page.',
+      array('!module' => l(t('Admin Notes'), 'https://www.drupal.org/project/admin_notes'))),
+      t('!module introduces a new content type "sitenotes." It also creates a menu item in the Admin >> Site building menu, where it is available only to privileged users.',
+      array('!module' => l(t('SiteNotes'), 'https://www.drupal.org/project/sitenotes'))),
+      t('!module consist of titles and text rendered into a block. The notes are specific to each authenticated user and can only be viewed by the user who created them.',
+      array('!module' => l(t('Personal Notes'), 'https://www.drupal.org/project/personal_notes'))),
+      t('!module creates a block with the ability to add, delete and edit notes. Notes are stored on a per path basis and the block can be made visible to certain roles/paths.',
       array('!module' => l(t('Stickynote'), 'https://www.drupal.org/project/stickynote'))),
     );
     $output .= theme('item_list', array('items' => $projects));
-    $output .= '<p>' . t('The difference from mentioned above modules is that Editor Notes creates
-    configurable ajaxified field (instead of blocks or content type)
-    that can be attached to the entity and associated with that entity.
-    Each field item has its author and controls CRUD operations based on authorship
-    (in the way like Comment module does).') . '</p>';
+    $output .= '<p>' . t('The difference from mentioned above modules is that Editor Notes creates configurable ajaxified field (instead of blocks or content type).') . '</p>';
+    $output .= '<p>' . t('Field can be attached to an entity and associated with that entity. Each field item controls CRUD operations based on authorship (like Comment module).') . '</p>';
 
     $output .= '<h3>' . t('Requirements') . '</h3>';
     $requirements = array(
@@ -105,7 +94,7 @@ function editor_note_help($path, $arg) {
  */
 function editor_note_menu() {
   $items['editor_note/edit/%ctools_js/%'] = array(
-    'title' => 'Update Note',
+    'title' => 'Update note',
     'page arguments' => array(2, 3),
     'page callback' => 'editor_note_confirm_edit_page',
     'access callback' => 'editor_note_access_crud_operations',
@@ -115,7 +104,7 @@ function editor_note_menu() {
   );
 
   $items['editor_note/remove/%ctools_js/%'] = array(
-    'title' => 'Remove Note',
+    'title' => 'Remove note',
     'page arguments' => array(2, 3),
     'page callback' => 'editor_note_confirm_remove_page',
     'access callback' => 'editor_note_access_crud_operations',
@@ -195,31 +184,31 @@ function editor_note_entity_property_info() {
     'entity_type' => array(
       'type' => 'text',
       'label' => t('Entity Type'),
-      'description' => 'The entity type editor note is attached to.',
+      'description' => t('The entity type editor note is attached to.'),
       'schema field' => 'entity_type',
     ),
     'bundle' => array(
       'type' => 'text',
       'label' => t('Bundle'),
-      'description' => 'The bundle of the entity editor note is attached to.',
+      'description' => t('The bundle of the entity editor note is attached to.'),
       'schema field' => 'bundle',
     ),
     'field_name' => array(
       'type' => 'text',
       'label' => t('Field Name'),
-      'description' => 'The field name of the field containing editor note.',
+      'description' => t('The field name of the field containing editor note.'),
       'schema field' => 'field_name',
     ),
     'entity_id' => array(
       'type' => 'integer',
       'label' => t('Entity ID'),
-      'description' => 'The entity id editor note is attached to.',
+      'description' => t('The entity id editor note is attached to.'),
       'schema field' => 'entity_id',
     ),
     'revision_id' => array(
       'type' => 'integer',
       'label' => t('Revision ID'),
-      'description' => 'The entity revision editor note is attached to.',
+      'description' => t('The entity revision editor note is attached to.'),
       'schema field' => 'revision_id',
     ),
     'uid' => array(
@@ -231,13 +220,13 @@ function editor_note_entity_property_info() {
     'created' => array(
       'type' => 'date',
       'label' => t('Created'),
-      'description' => 'The timestamp that the note was created.',
+      'description' => t('The timestamp that the note was created.'),
       'schema field' => 'created',
     ),
     'changed' => array(
       'type' => 'date',
       'label' => t('Changed'),
-      'description' => 'The timestamp that the note was last updated.',
+      'description' => t('The timestamp that the note was last updated.'),
       'schema field' => 'changed',
     ),
   );
@@ -406,14 +395,13 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#title' => t('Display a specified number of items.'),
     '#default_value' => $settings['limit'],
     '#required' => TRUE,
-    '#description' => t('Display a specified number of items. Set 0 for no limit.
-    Keep in mind that "Number of values" field has more priority here.'),
+    '#description' => t('Display a specified number of items. Set 0 for no limit.'),
     '#element_validate' => array('editor_note_validate_integer_positive_or_zero'),
   );
 
   $form['order'] = array(
     '#type' => 'radios',
-    '#title' => t('Notes Ordering'),
+    '#title' => t('Notes ordering'),
     '#options' => array(
       'DESC' => t('display recently updated notes first'),
       'ASC' => t('display recently updated notes last'),
@@ -481,13 +469,12 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#maxlength' => 3,
     '#required' => TRUE,
     '#element_validate' => array('editor_note_validate_float_positive_or_zero'),
-    '#description' => t('Sets opacity level for overlay. The opacity-level describes the transparency-level, where 1
-    is not transparent at all, 0.6 - 0.4 is nearly 50% see-through, and 0 is completely transparent.'),
+    '#description' => t('Sets opacity level for overlay where 1 is not transparent at all, 0.6 - 0.4 is nearly 50% see-through, and 0 is completely transparent.'),
   );
 
   $form['modal']['overlay']['bgcolor'] = array(
     '#type' => 'textfield',
-    '#title' => t('Background Color'),
+    '#title' => t('Background color'),
     '#default_value' => $settings['modal']['overlay']['bgcolor'],
     '#element_validate' => array('editor_note_validate_hex'),
     '#maxlength' => 6,
@@ -549,7 +536,7 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
 }
 
 /**
- * Implements hook_form_FORM_ID_alter().
+ * Implements hook_form_FORM_ID_alter() for field_ui_field_edit_form().
  *
  * Alters cardinality field of field settings form.
  */
@@ -622,7 +609,7 @@ function editor_note_field_widget_form(&$form, &$form_state, $field, $instance, 
       $element['note_add'] = array(
         '#type' => 'submit',
         '#name' => $field['field_name'] . '_add_note',
-        '#value' => t('Add Note'),
+        '#value' => t('Add note'),
         '#submit' => array('editor_note_add_note_submit'),
         '#validate' => array('editor_note_add_note_validate'),
         '#limit_validation_errors' => array(array($field['field_name'])),
@@ -682,8 +669,9 @@ function editor_note_field_validate($entity_type, $entity, $field, $instance, $l
           );
         }
       }
+
       if (!empty($item['note']) && $field['settings']['notes_maxlength'] > 0) {
-        if (mb_strlen($item['note']) > $field['settings']['notes_maxlength']) {
+        if (drupal_strlen($item['note']) > $field['settings']['notes_maxlength']) {
           $errors[$field['field_name']][$langcode][$delta][] = array(
             'error' => 'notes_maxlength',
             'message' => t('%name: the value cannot not be longer than %max characters.',
@@ -778,7 +766,7 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
 
     $element['order'] = array(
       '#type' => 'radios',
-      '#title' => t('Order Notes'),
+      '#title' => t('Order notes'),
       '#options' => array(
         'DESC' => t('display recently updated notes first'),
         'ASC' => t('display recently updated notes last'),
@@ -1156,7 +1144,7 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
       // Otherwise pager links point on /system/ajax after ajax refresh.
       // @see https://www.drupal.org/node/1181370#comment-6088864
       // for more details.
-      // @see theme_pager_link().
+      // @see theme_pager_link()
       if ($edit_path) {
         $_GET['q'] = $edit_path;
       }
@@ -1214,7 +1202,7 @@ function editor_note_access_crud_operations($note_id) {
 }
 
 /**
- * Validation handler for integer elements that must be positive or 0.
+ * Validates form element that accepts positive integer or 0.
  */
 function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
   // Checks for positive integer (or zero) value.
@@ -1225,7 +1213,7 @@ function editor_note_validate_integer_positive_or_zero($element, &$form_state) {
 }
 
 /**
- * Validation handler for float elements that must be >= 0 or <= 1.
+ * Validates form element that accepts float value and must be >= 0 or <= 1.
  */
 function editor_note_validate_float_positive_or_zero($element, &$form_state) {
   $value = trim($element['#value']);
@@ -1235,7 +1223,7 @@ function editor_note_validate_float_positive_or_zero($element, &$form_state) {
 }
 
 /**
- * Creates form element validation handler for HEX value.
+ * Validates form element that accepts HEX value.
  */
 function editor_note_validate_hex($element, &$form_state) {
   preg_match('/^[0-9A-Fa-f]{6}$/', trim($element['#value']), $matches);
@@ -1245,7 +1233,7 @@ function editor_note_validate_hex($element, &$form_state) {
 }
 
 /**
- * Creates form element validation handler for HEX value.
+ * Validates form element that accepts positive integer value (px) or 'auto'.
  */
 function editor_note_validate_size($element, &$form_state) {
   $value = $element['#value'];
@@ -1258,13 +1246,22 @@ function editor_note_validate_size($element, &$form_state) {
 }
 
 /**
- * Validate callback for 'editor_note_field_widget_form'.
+ * Validates value of 'Create a note' textarea during adding a note via ajax.
  */
 function editor_note_add_note_validate(&$form, &$form_state) {
   $field_name = str_replace('_add_note', '', $form_state['triggering_element']['#name']);
   $field_info = field_info_instance($form['#entity_type'], $field_name, $form['#bundle']);
-  if (empty($form_state['values'][$field_name][LANGUAGE_NONE][0]['note'])) {
+  $field = field_info_field($field_name);
+  $note = $form_state['values'][$field_name][LANGUAGE_NONE][0]['note'];
+  if (empty($note)) {
     form_set_error($field_name, t('Field %field_name is required.', array('%field_name' => $field_info['label'])));
+  }
+
+  if (!empty($note) && $field['settings']['notes_maxlength'] > 0) {
+    if (drupal_strlen($note) > $field['settings']['notes_maxlength']) {
+      form_set_error($field_name, t('%name: the value cannot not be longer than %max characters.',
+      array('%name' => $field_info['label'], '%max' => $field['settings']['notes_maxlength'])));
+    }
   }
 }
 

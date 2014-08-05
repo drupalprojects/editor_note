@@ -57,7 +57,7 @@ It saves time when adding/updating large amount of content.
 
 The difference from mentioned above modules is that Editor Notes creates
 configurable ajaxified field (instead of blocks or content type)
-that can be attached to the entity and associated with that entity.
+that can be attached to an entity and associated with that entity.
 Each field item has its author and controls CRUD operations based on authorship
 (in the way like Comment module does).
 

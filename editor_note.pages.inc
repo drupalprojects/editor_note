@@ -51,7 +51,7 @@ function editor_note_confirm_edit_form($form, $form_state, $note_id) {
 
     $form['note'] = array(
       '#type' => 'textarea',
-      '#title' => t('Update Note'),
+      '#title' => t('Update note'),
       '#default_value' => $note->note,
       '#required' => TRUE,
       '#rows' => $field['settings']['notes_size'],
