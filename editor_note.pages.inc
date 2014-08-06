@@ -345,7 +345,11 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   }
   else {
     drupal_set_message($message_text);
-    $form_state['redirect'] = implode('/', array($entity_type, $entity_id, 'edit'));
+    $form_state['redirect'] = implode('/', array(
+      $entity_type,
+      $entity_id,
+      'edit',
+    ));
   }
 }
 
@@ -365,7 +369,10 @@ function editor_note_confirm_form_cancel(&$form, &$form_state) {
     $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
   }
   else {
-    $form_state['redirect'] = implode('/',
-    array($form_state['values']['note_entity_type'], $form_state['values']['note_entity_id'], 'edit'));
+    $form_state['redirect'] = implode('/', array(
+      $form_state['values']['note_entity_type'],
+      $form_state['values']['note_entity_id'],
+      'edit',
+    ));
   }
 }
