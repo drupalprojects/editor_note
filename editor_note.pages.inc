@@ -41,13 +41,20 @@ function editor_note_confirm_edit_page($ajax = NULL, $note_id = NULL) {
 /**
  * Builds confirmation form for editing the note which displays in popup.
  */
-function editor_note_confirm_edit_form($form, $form_state, $note_id) {
+function editor_note_confirm_edit_form($form, $form_state, $note_id = NULL) {
   $note_id = isset($note_id) ? $note_id : (int) arg(3);
   $form = array();
   $note = editor_note_load($note_id);
 
   if ($note) {
     $field = field_info_field($note->field_name);
+
+    // Defines whether form has been opened via ajax or via regular page load.
+    // Accepts either 'ajax' or 'nojs'.
+    $form['method'] = array(
+      '#type' => 'value',
+      '#value' => arg(2) === 'ajax' ? 'ajax' : 'nojs',
+    );
 
     $form['note'] = array(
       '#type' => 'textarea',
@@ -70,6 +77,11 @@ function editor_note_confirm_edit_form($form, $form_state, $note_id) {
     $form['note_entity_type'] = array(
       '#type' => 'value',
       '#value' => $note->entity_type,
+    );
+
+    $form['note_bundle'] = array(
+      '#type' => 'value',
+      '#value' => $note->bundle,
     );
 
     $form['note_entity_id'] = array(
@@ -98,6 +110,7 @@ function editor_note_confirm_edit_form($form, $form_state, $note_id) {
     $form['actions']['update'] = array(
       '#type' => 'submit',
       '#value' => t('Update'),
+      '#validate' => array('editor_note_confirm_edit_form_validate_update'),
       '#submit' => array('editor_note_confirm_edit_form_update'),
     );
   }
@@ -117,10 +130,27 @@ function editor_note_confirm_edit_form($form, $form_state, $note_id) {
 }
 
 /**
- * Ajax callback for 'Update' button in 'editor_note_confirm_edit_form'.
+ * Validates value of 'Create a note' textarea during updating a note via ajax.
+ */
+function editor_note_confirm_edit_form_validate_update(&$form, &$form_state) {
+  $note = $form_state['values']['note'];
+  $field_name = $form_state['values']['note_field_name'];
+  $field = field_info_field($field_name);
+  $field_info = field_info_instance($form_state['values']['note_entity_type'], $field_name, $form_state['values']['note_bundle']);
+  if (!empty($note) && $field['settings']['notes_maxlength'] > 0) {
+    if (drupal_strlen($note) > $field['settings']['notes_maxlength']) {
+      form_set_error('note', t('%name: the value cannot not be longer than %max characters.',
+        array('%name' => $field_info['label'], '%max' => $field['settings']['notes_maxlength'])));
+    }
+  }
+}
+
+/**
+ * Submit callback for 'Update' button in 'editor_note_confirm_edit_form'.
  */
 function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   global $user;
+  $message_text = t('Note has been updated and saved.');
   $field_name = $form_state['values']['note_field_name'];
   $entity_type = $form_state['values']['note_entity_type'];
   $entity_id = $form_state['values']['note_entity_id'];
@@ -135,27 +165,32 @@ function editor_note_confirm_edit_form_update(&$form, &$form_state) {
   $note->uid = $user->uid;
   $note->save();
 
-  // Closes the modal.
-  $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+  if ($form_state['values']['method'] == 'ajax') {
+    // Closes the modal.
+    $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
-  // Displays remove message.
-  $message = theme(
-    'editor_note_message',
-    array(
-      'field_name' => $field_name,
-      'message_text' => t('Note has been updated and saved.'),
-      'message_type' => 'status',
-    )
-  );
+    // Displays remove message.
+    $message = theme(
+      'editor_note_message',
+      array(
+        'field_name' => $field_name,
+        'message_text' => $message_text,
+        'message_type' => 'status',
+      )
+    );
 
-  $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
+    $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
 
-  // Updates notes table and pager.
-  $entity_array = entity_load($entity_type, array($entity_id));
-  $entity = $entity_array[$entity_id];
-  $notes = editor_note_get_notes($entity_type, $entity, $field);
-  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
-  $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+    // Updates notes table and pager.
+    $entity_array = entity_load($entity_type, array($entity_id));
+    $entity = $entity_array[$entity_id];
+    $notes = editor_note_get_notes($entity_type, $entity, $field);
+    $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
+    $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+  }
+  else {
+    drupal_set_message($message_text);
+  }
 }
 
 /**
@@ -194,12 +229,19 @@ function editor_note_confirm_remove_page($ajax = NULL, $note_id = NULL) {
 /**
  * Builds confirmation form for removing the note which displays in popup.
  */
-function editor_note_confirm_remove_form($form, $form_state, $note_id) {
+function editor_note_confirm_remove_form($form, $form_state, $note_id = NULL) {
   $note_id = isset($note_id) ? $note_id : (int) arg(3);
   $form = array();
   $note = editor_note_load($note_id);
 
   if ($note) {
+    // Defines whether form has been opened via ajax or via regular page load.
+    // Accepts either 'ajax' or 'nojs'.
+    $form['method'] = array(
+      '#type' => 'value',
+      '#value' => arg(2) === 'ajax' ? 'ajax' : 'nojs',
+    );
+
     $form['note'] = array(
       '#markup' => '<p>' . t('Are you sure you want to remove the note? This action cannot be undone.') . '</p>',
     );
@@ -212,6 +254,11 @@ function editor_note_confirm_remove_form($form, $form_state, $note_id) {
     $form['note_entity_type'] = array(
       '#type' => 'value',
       '#value' => $note->entity_type,
+    );
+
+    $form['note_bundle'] = array(
+      '#type' => 'value',
+      '#value' => $note->bundle,
     );
 
     $form['note_entity_id'] = array(
@@ -259,9 +306,10 @@ function editor_note_confirm_remove_form($form, $form_state, $note_id) {
 }
 
 /**
- * Ajax callback for 'Remove' button in 'editor_note_confirm_remove_form'.
+ * Submit callback for 'Remove' button in 'editor_note_confirm_remove_form'.
  */
 function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
+  $message_text = t('Note has been removed.');
   $field_name = $form_state['values']['note_field_name'];
   $entity_type = $form_state['values']['note_entity_type'];
   $entity_id = $form_state['values']['note_entity_id'];
@@ -271,41 +319,53 @@ function editor_note_confirm_remove_form_remove(&$form, &$form_state) {
   // Removes note entity from the database.
   editor_note_delete($form_state['values']['note_id']);
 
-  // Closes the modal.
-  $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+  if ($form_state['values']['method'] == 'ajax') {
+    // Closes the modal.
+    $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
-  // Displays remove message.
-  $message = theme(
-    'editor_note_message',
-    array(
-      'field_name' => $field_name,
-      'message_text' => t('Note has been removed.'),
-      'message_type' => 'status',
-    )
-  );
+    // Displays remove message.
+    $message = theme(
+      'editor_note_message',
+      array(
+        'field_name' => $field_name,
+        'message_text' => $message_text,
+        'message_type' => 'status',
+      )
+    );
 
-  $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
+    $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
 
-  // Updates notes table and pager.
-  $field = field_info_field($field_name);
-  $entity_array = entity_load($entity_type, array($entity_id));
-  $entity = $entity_array[$note_id];
-  $notes = editor_note_get_notes($entity_type, $entity, $field);
-  $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
-  $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+    // Updates notes table and pager.
+    $field = field_info_field($field_name);
+    $entity_array = entity_load($entity_type, array($entity_id));
+    $entity = $entity_array[$note_id];
+    $notes = editor_note_get_notes($entity_type, $entity, $field);
+    $formatted_notes = editor_note_get_formatted_notes($field, $notes, TRUE, $edit_path);
+    $form_state['ajax_commands'][] = ajax_command_replace('#formatted_notes_' . $field_name, drupal_render($formatted_notes));
+  }
+  else {
+    drupal_set_message($message_text);
+    $form_state['redirect'] = implode('/', array($entity_type, $entity_id, 'edit'));
+  }
 }
 
 /**
- * Ajax callback for 'Cancel' button in 'editor_note_confirm_remove_form'.
+ * Submit callback for 'Cancel' button in 'editor_note_confirm_remove_form'.
  */
 function editor_note_confirm_form_cancel(&$form, &$form_state) {
-  $field_name = $form_state['values']['note_field_name'];
+  if ($form_state['values']['method'] == 'ajax') {
+    $field_name = $form_state['values']['note_field_name'];
 
-  // Closes the modal.
-  $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
+    // Closes the modal.
+    $form_state['ajax_commands'][] = ctools_modal_command_dismiss();
 
-  // Removes previous status message.
-  $message = theme('editor_note_message', array('field_name' => $field_name));
+    // Removes previous status message.
+    $message = theme('editor_note_message', array('field_name' => $field_name));
 
-  $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
+    $form_state['ajax_commands'][] = ajax_command_replace('#status_message_' . $field_name, $message);
+  }
+  else {
+    $form_state['redirect'] = implode('/',
+    array($form_state['values']['note_entity_type'], $form_state['values']['note_entity_id'], 'edit'));
+  }
 }
