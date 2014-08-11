@@ -829,13 +829,12 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
   $summary = array();
 
   if ($display['type'] == 'editor_note_field_formatter') {
-    $summary[] = t('Display a specified number of items') . ': ' . $display['settings']['limit'];
-    $summary[] = t('Notes Ordering') . ': ' .
-      ($settings['order'] == 'DESC' ? t('display recently updated notes first') : t('display recently updated notes last'));
+    $order = $settings['order'] == 'DESC' ? t('display recently updated notes first') : t('display recently updated notes last');
+    $summary[] = t('Display a specified number of items: @limit.', array('@limit' => $display['settings']['limit']));
+    $summary[] = t('Notes Ordering: !order.', array('!order' => $order));
     if ($display['settings']['limit'] > 0) {
-      $summary[] = t('Enable pagination') . ': ' . ($settings['pager']['enabled'] ? 'true' : 'false');
-      $summary[] = t('Pagination below notes table') . ': ' .
-        ($settings['pager']['pager_below'] ? 'true' : 'false');
+      $summary[] = t('Enable pagination: !enabled.', array('!enabled' => ($settings['pager']['enabled'] ? 'true' : 'false')));
+      $summary[] = t('Pagination below notes table: !pager.', array('!pager' => ($settings['pager']['pager_below'] ? 'true' : 'false')));
     }
   }
 
