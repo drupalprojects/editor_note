@@ -716,7 +716,9 @@ function editor_note_field_insert($entity_type, $entity, $field, $instance, $lan
 function editor_note_field_update($entity_type, $entity, $field, $instance, $langcode, &$items) {
   if ($field['type'] == 'editor_note') {
     foreach ($items as $item) {
-      editor_note_save($item['note'], $entity_type, $entity, $field['field_name']);
+      if (isset($item['note'])) {
+        editor_note_save($item['note'], $entity_type, $entity, $field['field_name']);
+      }
     }
   }
 }
