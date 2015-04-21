@@ -93,22 +93,22 @@ function editor_note_help($path, $arg) {
  * Implements hook_menu().
  */
 function editor_note_menu() {
-  $items['editor_note/edit/%ctools_js/%'] = array(
+  $items['editor_note/edit/%ctools_js/%/%'] = array(
     'title' => 'Update note',
-    'page arguments' => array(2, 3),
+    'page arguments' => array(2, 4),
     'page callback' => 'editor_note_confirm_edit_page',
     'access callback' => 'editor_note_access_crud_operations',
-    'access arguments' => array(3),
+    'access arguments' => array(3, 4),
     'type' => MENU_NORMAL_ITEM,
     'file' => 'editor_note.pages.inc',
   );
 
-  $items['editor_note/remove/%ctools_js/%'] = array(
+  $items['editor_note/remove/%ctools_js/%/%'] = array(
     'title' => 'Remove note',
-    'page arguments' => array(2, 3),
+    'page arguments' => array(2, 4),
     'page callback' => 'editor_note_confirm_remove_page',
     'access callback' => 'editor_note_access_crud_operations',
-    'access arguments' => array(3),
+    'access arguments' => array(3, 4),
     'type' => MENU_NORMAL_ITEM,
     'file' => 'editor_note.pages.inc',
   );
@@ -313,6 +313,7 @@ function editor_note_field_info() {
       'label' => t('Editor Notes'),
       'description' => t('Field for taking editor notes.'),
       'settings' => array(
+        'notes_permissions' => 'default',
         'notes_size' => 5,
         'notes_placeholder' => t('Create a note'),
         'notes_maxlength' => 0,
@@ -363,6 +364,18 @@ function editor_note_field_is_empty($item, $field) {
  */
 function editor_note_field_settings_form($field, $instance, $has_data) {
   $settings = $field['settings'];
+
+  $form['notes_permissions'] = array(
+    '#type' => 'radios',
+    '#title' => t('Field-level permissions'),
+    '#required' => TRUE,
+    '#description' => t('"Default" mode means usage of "Administer any editor note" while "Create only" mode can be used to prevent ability to update or edit notes.'),
+    '#default_value' => $settings['notes_permissions'],
+    '#options' => array(
+      'default' => t('Default'),
+      'create_only' => t('Create only'),
+    ),
+  );
 
   $form['notes_size'] = array(
     '#type' => 'textfield',
@@ -1100,19 +1113,19 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
       );
 
       if ($widget) {
-        $operations = !editor_note_access_crud_operations($note_id) ? '' : theme(
+        $operations = !editor_note_access_crud_operations($field['field_name'], $note_id) ? '' : theme(
           'item_list',
           array(
             'items' => array(
               ctools_modal_text_button(
                 t('edit'),
-                'editor_note/edit/nojs/' . $note_id,
+                'editor_note/edit/nojs/' . $field['field_name'] . '/' . $note_id,
                 t('Edit the note'),
                 drupal_html_class('ctools-modal-' . $field['field_name'] . '-edit')
               ),
               ctools_modal_text_button(
                 t('remove'),
-                'editor_note/remove/nojs/' . $note_id,
+                'editor_note/remove/nojs/' . $field['field_name'] . '/' . $note_id,
                 t('Remove the note'),
                 drupal_html_class('ctools-modal-' . $field['field_name'] . '-remove')
               ),
@@ -1194,8 +1207,20 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
  * @return bool
  *   Boolean indicating whether the user may perform operations on notes or not.
  */
-function editor_note_access_crud_operations($note_id) {
+function editor_note_access_crud_operations($field_name, $note_id) {
+  $field = field_info_field($field_name);
+  if (!$field) {
+    return FALSE;
+  }
+
   global $user;
+  $create_only_permission = isset($field['settings']['notes_permissions']) &&
+    $field['settings']['notes_permissions'] == 'create_only';
+
+  if ($create_only_permission && $user->uid != 1) {
+    return FALSE;
+  }
+
   $note_uid = db_query('SELECT en.uid FROM {editor_note} en WHERE id = :id',
     array(':id' => $note_id))->fetchField();
 
