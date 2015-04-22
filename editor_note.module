@@ -369,8 +369,9 @@ function editor_note_field_settings_form($field, $instance, $has_data) {
     '#type' => 'radios',
     '#title' => t('Field-level permissions'),
     '#required' => TRUE,
-    '#description' => t('"Default" mode means usage of "Administer any editor note" while "Create only" mode can be used to prevent ability to update or edit notes.'),
-    '#default_value' => $settings['notes_permissions'],
+    '#description' => t('"Default" mode means configuring "Administer any editor note" permission on !permissions page while "Create only" mode can be used to prevent ability to update or edit notes.',
+      array('!permissions' => l('Permissions', 'admin/people/permissions'))),
+    '#default_value' => isset($settings['notes_permissions']) ? $settings['notes_permissions'] : 'default',
     '#options' => array(
       'default' => t('Default'),
       'create_only' => t('Create only'),
