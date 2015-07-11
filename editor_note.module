@@ -760,6 +760,7 @@ function editor_note_field_formatter_info() {
       'label' => t('Editor Notes table'),
       'field types' => array('editor_note'),
       'settings' => array(
+        'notes_display_mode' => 'per_revision',
         'limit' => 10,
         'order' => 'DESC',
         'display' => 1,
@@ -783,6 +784,18 @@ function editor_note_field_formatter_settings_form($field, $instance, $view_mode
   $element = array();
 
   if ($display['type'] == 'editor_note_field_formatter') {
+    $element['notes_display_mode'] = array(
+      '#type' => 'radios',
+      '#title' => t('Display mode'),
+      '#required' => TRUE,
+      '#description' => t('"Display list of notes per entity revision" means separate list of notes for each revision while "Display list of notes per entity" displays combined list of notes for all revisions.'),
+      '#default_value' => isset($settings['notes_display_mode']) ? $settings['notes_display_mode'] : 'per_revision',
+      '#options' => array(
+        'per_revision' => t('Display list of notes per entity revision'),
+        'per_entity' => t('Display list of notes per entity'),
+      ),
+    );
+
     $element['limit'] = array(
       '#type' => 'textfield',
       '#title' => t('Display a specified number of items.'),
@@ -857,12 +870,22 @@ function editor_note_field_formatter_settings_summary($field, $instance, $view_m
   $summary = array();
 
   if ($display['type'] == 'editor_note_field_formatter') {
-    $order = $settings['order'] == 'DESC' ? t('display recently updated notes first') : t('display recently updated notes last');
+    $display_mode_raw = isset($settings['notes_display_mode']) ?
+      $settings['notes_display_mode'] : 'per_revision';
+    $display_mode = $display_mode_raw == 'per_revision' ?
+      t('display list of notes per entity revision') : t('display list of notes per entity');
+    $order = $settings['order'] == 'DESC' ?
+      t('display recently updated notes first') : t('display recently updated notes last');
+
+    $summary[] = t('Display mode: @display_mode.', array('@display_mode' => $display_mode));
     $summary[] = t('Display a specified number of items: @limit.', array('@limit' => $display['settings']['limit']));
     $summary[] = t('Notes Ordering: !order.', array('!order' => $order));
+
     if ($display['settings']['limit'] > 0) {
-      $summary[] = t('Enable pagination: !enabled.', array('!enabled' => ($settings['pager']['enabled'] ? 'true' : 'false')));
-      $summary[] = t('Pagination below notes table: !pager.', array('!pager' => ($settings['pager']['pager_below'] ? 'true' : 'false')));
+      $summary[] = t('Enable pagination: !enabled.',
+        array('!enabled' => ($settings['pager']['enabled'] ? 'true' : 'false')));
+      $summary[] = t('Pagination below notes table: !pager.',
+        array('!pager' => ($settings['pager']['pager_below'] ? 'true' : 'false')));
     }
   }
 
@@ -880,6 +903,7 @@ function editor_note_field_load($entity_type, $entities, $field, $instances, $la
     foreach ($entities as $id => $entity) {
       $delta = 0;
       $notes = editor_note_get_notes($entity_type, $entity, $field, TRUE);
+
       foreach ($notes as $note_id) {
         $items[$id][$delta]['editor_note_id'] = $note_id;
         $delta++;
@@ -895,9 +919,11 @@ function editor_note_field_load($entity_type, $entities, $field, $instances, $la
  */
 function editor_note_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
   $element = array();
-  $display['field_name'] = $field['field_name'];
 
   if ($display['type'] == 'editor_note_field_formatter') {
+    $display['field_name'] = $field['field_name'];
+    $display['settings']['notes_display_mode'] = isset($display['settings']['notes_display_mode']) ?
+      $display['settings']['notes_display_mode'] : 'per_revision';
     $notes = editor_note_get_notes($entity_type, $entity, $display);
 
     if (!empty($notes)) {
@@ -1004,6 +1030,7 @@ function editor_note_delete($note_id) {
  */
 function editor_note_get_notes($entity_type, $entity, array $field, $id_only = FALSE) {
   list($entity_id, $revision_id, $bundle) = entity_extract_ids($entity_type, $entity);
+
   if (!isset($revision_id)) {
     $revision_id = $entity_id;
   }
