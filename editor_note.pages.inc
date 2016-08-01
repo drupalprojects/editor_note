@@ -29,6 +29,9 @@ function editor_note_confirm_edit_page($ajax = NULL, $note_id = NULL) {
       $output = $form_state['ajax_commands'];
     }
 
+    // Prevents adding system default theme CSS to the admin theme.
+    $_POST['ajax_page_state']['css'] = array();
+
     // Returns the ajax instructions to the browser via ajax_render().
     print ajax_render($output);
     drupal_exit();
@@ -216,6 +219,9 @@ function editor_note_confirm_remove_page($ajax = NULL, $note_id = NULL) {
     if (!empty($form_state['ajax_commands'])) {
       $output = $form_state['ajax_commands'];
     }
+
+    // Prevents adding system default theme CSS to the admin theme.
+    $_POST['ajax_page_state']['css'] = array();
 
     // Returns the ajax instructions to the browser via ajax_render().
     print ajax_render($output);
