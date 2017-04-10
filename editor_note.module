@@ -101,6 +101,7 @@ function editor_note_menu() {
     'access arguments' => array(3, 4),
     'type' => MENU_NORMAL_ITEM,
     'file' => 'editor_note.pages.inc',
+    'theme callback' => 'ajax_base_page_theme',
   );
 
   $items['editor_note/remove/%ctools_js/%/%'] = array(
@@ -111,6 +112,7 @@ function editor_note_menu() {
     'access arguments' => array(3, 4),
     'type' => MENU_NORMAL_ITEM,
     'file' => 'editor_note.pages.inc',
+    'theme callback' => 'ajax_base_page_theme',
   );
 
   return $items;
