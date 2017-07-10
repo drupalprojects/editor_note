@@ -1246,6 +1246,8 @@ function editor_note_get_formatted_notes(array $field, array $notes, $widget = F
     }
   }
 
+  // Hook is to allow other modules to alter the formatted notes
+  // before they are rendered.
   drupal_alter('editor_note_format_notes', $formatted_notes);
 
   return $formatted_notes;

@@ -15,6 +15,6 @@
  * @return
  *   Renderable array of Editor notes.
  */
-function hook_editor_note_format_notes_alter($formatted_notes) {
+function hook_editor_note_format_notes_alter($notes) {
 
 }
